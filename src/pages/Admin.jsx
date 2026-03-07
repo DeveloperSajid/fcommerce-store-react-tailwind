@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase';
-import { collection, addDoc, getDocs, doc, updateDoc } from 'firebase/firestore';
+// increment ইম্পোর্ট করা হলো স্টক কমানোর জন্য
+import { collection, addDoc, getDocs, doc, updateDoc, increment } from 'firebase/firestore';
 
 const Admin = () => {
-  // কোন ট্যাবটি ওপেন থাকবে তার স্টেট (ডিফল্ট: addProduct)
   const [activeTab, setActiveTab] = useState('orders'); 
 
   // --- প্রোডাক্ট অ্যাড করার স্টেট ও ফাংশন ---
@@ -45,7 +45,6 @@ const Admin = () => {
         ...doc.data()
       }));
       
-      // নতুন অর্ডারগুলো সবার উপরে দেখানোর জন্য সর্টিং
       ordersArray.sort((a, b) => {
         const dateA = a.orderDate?.toDate() || 0;
         const dateB = b.orderDate?.toDate() || 0;
@@ -60,19 +59,32 @@ const Admin = () => {
     }
   };
 
-  // স্ট্যাটাস আপডেট করার ফাংশন (Pending -> Delivered)
-  const updateOrderStatus = async (orderId, newStatus) => {
+  // স্ট্যাটাস আপডেট এবং স্টক কমানোর ফাংশন
+  const updateOrderStatus = async (order, newStatus) => {
     try {
-      const orderRef = doc(db, "orders", orderId);
+      // ১. অর্ডারের স্ট্যাটাস আপডেট করা
+      const orderRef = doc(db, "orders", order.id);
       await updateDoc(orderRef, { status: newStatus });
-      alert(`অর্ডারের স্ট্যাটাস '${newStatus}'-এ আপডেট করা হয়েছে!`);
-      fetchOrders(); // স্ট্যাটাস আপডেট হলে অর্ডার লিস্ট রিফ্রেশ হবে
+
+      // ২. যদি স্ট্যাটাস Delivered হয়, তাহলে ডেটাবেস থেকে স্টক কমানো
+      if (newStatus === 'Delivered') {
+        for (const item of order.orderItems) {
+          const productRef = doc(db, "products", item.id);
+          await updateDoc(productRef, {
+            // increment দিয়ে নেগেটিভ ভ্যালু পাঠালে সেটি মেইন স্টক থেকে বিয়োগ হয়ে যাবে
+            stock: increment(-item.quantity) 
+          });
+        }
+      }
+
+      alert(`অর্ডারের স্ট্যাটাস '${newStatus}'-এ আপডেট করা হয়েছে এবং স্টক কমানো হয়েছে!`);
+      fetchOrders(); 
     } catch (error) {
       console.error("Error updating status: ", error);
+      alert("স্ট্যাটাস আপডেট করতে সমস্যা হয়েছে।");
     }
   };
 
-  // যখনই 'orders' ট্যাবে ক্লিক করা হবে, তখনই ফায়ারবেস থেকে অর্ডারগুলো আনবে
   useEffect(() => {
     if (activeTab === 'orders') {
       fetchOrders();
@@ -84,7 +96,6 @@ const Admin = () => {
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       <h1 className="text-3xl font-bold text-gray-800 mb-8 text-center">অ্যাডমিন ড্যাশবোর্ড</h1>
 
-      {/* ট্যাব নেভিগেশন মেনু */}
       <div className="flex justify-center gap-4 mb-8">
         <button 
           onClick={() => setActiveTab('orders')}
@@ -100,7 +111,6 @@ const Admin = () => {
         </button>
       </div>
 
-      {/* কাস্টমার অর্ডার ট্যাব */}
       {activeTab === 'orders' && (
         <div className="bg-white rounded-lg shadow-lg p-6">
           <h2 className="text-xl font-bold text-gray-800 border-b pb-4 mb-6">সর্বশেষ অর্ডারসমূহ</h2>
@@ -154,10 +164,10 @@ const Admin = () => {
                     </div>
                   </div>
 
-                  {/* স্ট্যাটাস আপডেট বাটন */}
                   {order.status !== 'Delivered' && (
                     <button 
-                      onClick={() => updateOrderStatus(order.id, 'Delivered')}
+                      // এখানে শুধু ID এর বদলে পুরো order অবজেক্টটি পাঠানো হচ্ছে
+                      onClick={() => updateOrderStatus(order, 'Delivered')}
                       className="w-full bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 rounded transition"
                     >
                       Mark as Delivered
@@ -170,7 +180,6 @@ const Admin = () => {
         </div>
       )}
 
-      {/* নতুন প্রোডাক্ট যোগ ট্যাব (আগের কোড) */}
       {activeTab === 'addProduct' && (
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-2xl mx-auto">
           <h2 className="text-xl font-bold text-gray-800 mb-6 text-center border-b pb-4">নতুন প্রোডাক্ট আপলোড করুন</h2>
