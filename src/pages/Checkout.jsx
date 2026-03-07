@@ -8,41 +8,67 @@ const Checkout = () => {
 
   const [formData, setFormData] = useState({
     name: '',
-    phone: '01', // ডিফল্টভাবে '01' সেট করা হলো
+    phone: '01',
     address: '',
     paymentMethod: 'cod',
-    bkashNumber: '',
+    bkashNumber: '01', // বিকাশের জন্যও ডিফল্ট '01'
     trxId: ''
   });
 
+  // সাধারণ ইনপুট পরিবর্তন (Address, Payment Method)
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // ফোন নম্বরের জন্য বিশেষ ফাংশন (শুধুমাত্র সংখ্যা, '01' ফিক্সড এবং সর্বোচ্চ ১১ ডিজিট)
-  const handlePhoneChange = (e) => {
-    let inputValue = e.target.value;
+  // নামের জন্য ভ্যালিডেশন (শুধু লেটার, স্পেস, ডট এবং সর্বোচ্চ ৩০ ক্যারেক্টার)
+  const handleNameChange = (e) => {
+    // বাংলা ও ইংরেজি বর্ণমালা, স্পেস এবং ডট ছাড়া সব বাদ দেওয়া হচ্ছে
+    let val = e.target.value.replace(/[^a-zA-Z\u0980-\u09FF\s.]/g, ''); 
+    if (val.length <= 30) {
+      setFormData({ ...formData, name: val });
+    }
+  };
 
-    // যেকোনো অক্ষর বা স্পেস বাদ দিয়ে শুধু সংখ্যা (0-9) রাখা হচ্ছে
+  // ফোন এবং বিকাশ নম্বরের জন্য কমন ভ্যালিডেশন
+  const handlePhoneNumberChange = (e, field) => {
+    let inputValue = e.target.value;
     let onlyNums = inputValue.replace(/[^0-9]/g, '');
 
-    // যদি ইউজার '01' মুছে ফেলতে চায়, তবে জোর করে '01' বসিয়ে দেওয়া হবে
     if (!onlyNums.startsWith('01')) {
       onlyNums = '01'; 
     }
 
-    // ১১ ডিজিটের বেশি টাইপ করতে দেবে না
     if (onlyNums.length <= 11) {
-      setFormData({ ...formData, phone: onlyNums });
+      setFormData({ ...formData, [field]: onlyNums });
     }
   };
 
+  // TrxID এর জন্য ভ্যালিডেশন (শুধু লেটার, নাম্বার এবং সর্বোচ্চ ৩০ ক্যারেক্টার)
+  const handleTrxIdChange = (e) => {
+    let val = e.target.value.replace(/[^a-zA-Z0-9]/g, '');
+    if (val.length <= 30) {
+      setFormData({ ...formData, trxId: val });
+    }
+  };
+
+  // ফর্ম সাবমিট
   const handlePlaceOrder = (e) => {
     e.preventDefault();
     
     if (formData.phone.length !== 11) {
-      alert("অনুগ্রহ করে ১১ ডিজিটের সঠিক মোবাইল নম্বর দিন।");
+      alert("অনুগ্রহ করে আপনার ১১ ডিজিটের সঠিক মোবাইল নম্বর দিন।");
       return;
+    }
+
+    if (formData.paymentMethod === 'bkash') {
+      if (formData.bkashNumber.length !== 11) {
+        alert("অনুগ্রহ করে ১১ ডিজিটের সঠিক বিকাশ নম্বর দিন।");
+        return;
+      }
+      if (formData.trxId.length === 0) {
+        alert("অনুগ্রহ করে Transaction ID (TrxID) দিন।");
+        return;
+      }
     }
     
     console.log("Order Details:", { items: cart, total: cartTotal, customer: formData });
@@ -61,6 +87,11 @@ const Checkout = () => {
     );
   }
 
+  // বাটন ডিজেবল করার লজিক
+  const isFormValid = formData.phone.length === 11 && 
+                      (formData.paymentMethod === 'cod' || 
+                      (formData.paymentMethod === 'bkash' && formData.bkashNumber.length === 11 && formData.trxId.length > 0));
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       <h1 className="text-3xl font-bold text-gray-800 mb-8">চেকআউট</h1>
@@ -74,10 +105,18 @@ const Checkout = () => {
           <form onSubmit={handlePlaceOrder} className="space-y-4">
             <div>
               <label className="block text-gray-700 font-semibold mb-2">আপনার নাম *</label>
-              <input type="text" name="name" value={formData.name} required onChange={handleInputChange} className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="সম্পূর্ণ নাম লিখুন" />
+              <input 
+                type="text" 
+                name="name" 
+                value={formData.name} 
+                required 
+                onChange={handleNameChange} 
+                className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                placeholder="সম্পূর্ণ নাম লিখুন" 
+              />
+              <p className="text-xs text-gray-500 mt-1 text-right">{formData.name.length}/30</p>
             </div>
             
-            {/* ফোন নম্বর ইনপুট এবং ভ্যালিডেশন মেসেজ */}
             <div>
               <label className="block text-gray-700 font-semibold mb-2">মোবাইল নম্বর *</label>
               <input 
@@ -85,27 +124,31 @@ const Checkout = () => {
                 name="phone" 
                 value={formData.phone} 
                 required 
-                onChange={handlePhoneChange} 
+                onChange={(e) => handlePhoneNumberChange(e, 'phone')} 
                 className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium" 
                 placeholder="01XXXXXXXXX" 
               />
-              
-              {/* রিয়েল-টাইম ফিডব্যাক মেসেজ */}
               {formData.phone.length > 2 && formData.phone.length < 11 && (
-                <p className="text-sm text-red-500 mt-1 font-medium">
-                  আর {11 - formData.phone.length} টি সংখ্যা দিতে হবে
-                </p>
+                <p className="text-sm text-red-500 mt-1 font-medium">আর {11 - formData.phone.length} টি সংখ্যা দিতে হবে</p>
               )}
               {formData.phone.length === 11 && (
-                <p className="text-sm text-green-600 mt-1 font-bold">
-                  ✓ সঠিক ফোন নম্বর
-                </p>
+                <p className="text-sm text-green-600 mt-1 font-bold">✓ সঠিক ফোন নম্বর</p>
               )}
             </div>
             
             <div>
               <label className="block text-gray-700 font-semibold mb-2">পূর্ণাঙ্গ ঠিকানা *</label>
-              <textarea name="address" value={formData.address} required onChange={handleInputChange} rows="3" className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="বাসা নং, রাস্তা, এলাকা, জেলা"></textarea>
+              <textarea 
+                name="address" 
+                value={formData.address} 
+                required 
+                maxLength="200"
+                onChange={handleInputChange} 
+                rows="3" 
+                className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                placeholder="বাসা নং, রাস্তা, এলাকা, জেলা"
+              ></textarea>
+              <p className="text-xs text-gray-500 mt-1 text-right">{formData.address.length}/200</p>
             </div>
 
             {/* পেমেন্ট মেথড সিলেকশন */}
@@ -129,17 +172,44 @@ const Checkout = () => {
               <div className="bg-pink-50 p-4 rounded-md border border-pink-200 mt-3 animate-fade-in">
                 <p className="text-sm text-gray-700 mb-3">অনুগ্রহ করে আমাদের পার্সোনাল নম্বরে (01XXXXXXXXX) টাকা Send Money করুন এবং নিচের তথ্যগুলো দিন।</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <input type="text" name="bkashNumber" value={formData.bkashNumber} required={formData.paymentMethod === 'bkash'} onChange={handleInputChange} className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-pink-500" placeholder="যে নম্বর থেকে টাকা পাঠিয়েছেন" />
-                  <input type="text" name="trxId" value={formData.trxId} required={formData.paymentMethod === 'bkash'} onChange={handleInputChange} className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-pink-500" placeholder="Transaction ID (TrxID)" />
+                  <div>
+                    <input 
+                      type="text" 
+                      name="bkashNumber" 
+                      value={formData.bkashNumber} 
+                      required={formData.paymentMethod === 'bkash'} 
+                      onChange={(e) => handlePhoneNumberChange(e, 'bkashNumber')} 
+                      className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-pink-500 font-medium" 
+                      placeholder="যে নম্বর থেকে টাকা পাঠিয়েছেন" 
+                    />
+                    {formData.bkashNumber.length > 2 && formData.bkashNumber.length < 11 && (
+                      <p className="text-sm text-red-500 mt-1 font-medium">আর {11 - formData.bkashNumber.length} টি সংখ্যা দিতে হবে</p>
+                    )}
+                    {formData.bkashNumber.length === 11 && (
+                      <p className="text-sm text-green-600 mt-1 font-bold">✓ সঠিক বিকাশ নম্বর</p>
+                    )}
+                  </div>
+                  <div>
+                    <input 
+                      type="text" 
+                      name="trxId" 
+                      value={formData.trxId} 
+                      required={formData.paymentMethod === 'bkash'} 
+                      onChange={handleTrxIdChange} 
+                      className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-pink-500 uppercase" 
+                      placeholder="Transaction ID (TrxID)" 
+                    />
+                    <p className="text-xs text-gray-500 mt-1 text-right">{formData.trxId.length}/30</p>
+                  </div>
                 </div>
               </div>
             )}
 
             <button 
               type="submit" 
-              disabled={formData.phone.length < 11}
+              disabled={!isFormValid}
               className={`w-full text-white font-bold py-3 rounded-md mt-6 transition duration-300 ${
-                formData.phone.length < 11 
+                !isFormValid 
                   ? 'bg-gray-400 cursor-not-allowed' 
                   : 'bg-blue-600 hover:bg-blue-700'
               }`}
