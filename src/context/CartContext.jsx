@@ -4,6 +4,9 @@ export const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState([]);
+  
+  // কার্ট ওপেন/ক্লোজ করার জন্য নতুন স্টেট
+  const [isCartOpen, setIsCartOpen] = useState(false); 
 
   const addToCart = (product) => {
     const existingItem = cart.find(item => item.id === product.id);
@@ -14,6 +17,8 @@ export const CartProvider = ({ children }) => {
     } else {
       setCart([...cart, { ...product, quantity: 1 }]);
     }
+    // প্রোডাক্ট কার্টে যোগ হওয়ার সাথে সাথেই কার্ট ড্রয়ারটি ওপেন হয়ে যাবে
+    setIsCartOpen(true); 
   };
 
   const removeFromCart = (id) => {
@@ -33,7 +38,6 @@ export const CartProvider = ({ children }) => {
     }));
   };
 
-  // অর্ডার কনফার্ম হওয়ার পর কার্ট খালি করার ফাংশন
   const clearCart = () => {
     setCart([]);
   };
@@ -42,7 +46,10 @@ export const CartProvider = ({ children }) => {
   const cartTotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
 
   return (
-    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, clearCart, cartCount, cartTotal }}>
+    <CartContext.Provider value={{ 
+      cart, addToCart, removeFromCart, updateQuantity, clearCart, cartCount, cartTotal,
+      isCartOpen, setIsCartOpen // নতুন স্টেটগুলো এখানে পাস করা হলো
+    }}>
       {children}
     </CartContext.Provider>
   );
