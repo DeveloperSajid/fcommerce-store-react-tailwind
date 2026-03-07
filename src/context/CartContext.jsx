@@ -1,32 +1,47 @@
 import { createContext, useState } from 'react';
 
-// Context তৈরি করা হলো
 export const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState([]);
 
-  // কার্টে প্রোডাক্ট যোগ করার ফাংশন
+  // কার্টে যোগ করা
   const addToCart = (product) => {
-    // চেক করা হচ্ছে প্রোডাক্টটি আগে থেকেই কার্টে আছে কি না
     const existingItem = cart.find(item => item.id === product.id);
-    
     if (existingItem) {
-      // থাকলে শুধু পরিমাণ (quantity) ১ বাড়িয়ে দেওয়া হবে
       setCart(cart.map(item => 
         item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
       ));
     } else {
-      // না থাকলে নতুন করে কার্টে যোগ করা হবে
       setCart([...cart, { ...product, quantity: 1 }]);
     }
   };
 
-  // কার্টে মোট কয়টি প্রোডাক্ট আছে তার হিসাব
+  // কার্ট থেকে রিমুভ করা
+  const removeFromCart = (id) => {
+    setCart(cart.filter(item => item.id !== id));
+  };
+
+  // পরিমাণ (Quantity) আপডেট করা
+  const updateQuantity = (id, type) => {
+    setCart(cart.map(item => {
+      if (item.id === id) {
+        if (type === 'increase' && item.quantity < item.stock) {
+          return { ...item, quantity: item.quantity + 1 };
+        } else if (type === 'decrease' && item.quantity > 1) {
+          return { ...item, quantity: item.quantity - 1 };
+        }
+      }
+      return item;
+    }));
+  };
+
+  // মোট সংখ্যা ও দাম হিসাব করা
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
+  const cartTotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
 
   return (
-    <CartContext.Provider value={{ cart, addToCart, cartCount }}>
+    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, cartCount, cartTotal }}>
       {children}
     </CartContext.Provider>
   );
