@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import ProductCard from '../components/ProductCard';
-// ফায়ারবেস ইম্পোর্ট
+import HeroSlider from '../components/HeroSlider'; // স্লাইডার ইম্পোর্ট করা হলো
 import { db } from '../firebase';
 import { collection, getDocs } from 'firebase/firestore';
 
@@ -9,7 +9,6 @@ const Home = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // ফায়ারবেস থেকে প্রোডাক্ট আনার ফাংশন
     const fetchProducts = async () => {
       try {
         const querySnapshot = await getDocs(collection(db, "products"));
@@ -31,9 +30,12 @@ const Home = () => {
   return (
     <div className="container mx-auto px-4 py-8">
       
-      <div className="text-center mb-10">
+      {/* ম্যাজিক স্লাইডার এখানে বসানো হলো */}
+      <HeroSlider />
+      
+      <div className="text-center mb-10 mt-12">
         <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-3">আমাদের কালেকশন</h1>
-        <p className="text-gray-600">ফেসবুক পেজের সেরা প্রোডাক্টগুলো এখন সরাসরি ওয়েবসাইটে!</p>
+        <p className="text-gray-600">সেরা প্রোডাক্টগুলো এখন সরাসরি ওয়েবসাইটে!</p>
       </div>
 
       {loading ? (
