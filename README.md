@@ -68,6 +68,30 @@ A dynamic e-commerce web application built to streamline the sale of products di
    * *If bKash is selected:* Extra input fields appear to securely collect the bKash TrxID and Sender Phone Number.
 4. **Data Submission:** The final order object is sent to the backend (Firebase / Express API) and safely stored in the database for the admin to review.
 
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ১. প্রোডাক্টস কালেকশনের রুলস
+    match /products/{productId} {
+      // যে কেউ প্রোডাক্ট দেখতে পারবে
+      allow read: if true; 
+      // শুধু লগইন করা ইউজার (অ্যাডমিন) প্রোডাক্ট যোগ/এডিট/ডিলিট করতে পারবে
+      allow write: if request.auth != null; 
+    }
 
+    // ২. অর্ডারস কালেকশনের রুলস
+    match /orders/{orderId} {
+      // যে কেউ নতুন অর্ডার প্লেস (create) করতে পারবে
+      allow create: if true; 
+      // শুধু লগইন করা ইউজার (অ্যাডমিন) অর্ডার দেখতে, এডিট বা ডিলিট করতে পারবে
+      allow read, update, delete: if request.auth != null; 
+    }
+    
+  }
+}
+
+```
 ## 👨‍💻 Developed By
 **Sajid**
