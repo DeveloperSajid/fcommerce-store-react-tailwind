@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
-import { db } from '../firebase';
-// increment ইম্পোর্ট করা হলো স্টক কমানোর জন্য
+// auth ইম্পোর্ট করা হলো
+import { db, auth } from '../firebase'; 
+// increment এবং ফায়ারস্টোরের অন্যান্য ফাংশন
 import { collection, addDoc, getDocs, doc, updateDoc, increment } from 'firebase/firestore';
+// লগআউট করার জন্য signOut ইম্পোর্ট
+import { signOut } from 'firebase/auth'; 
 
 const Admin = () => {
   const [activeTab, setActiveTab] = useState('orders'); 
@@ -45,6 +48,7 @@ const Admin = () => {
         ...doc.data()
       }));
       
+      // নতুন অর্ডারগুলো সবার উপরে দেখানোর জন্য সর্টিং
       ordersArray.sort((a, b) => {
         const dateA = a.orderDate?.toDate() || 0;
         const dateB = b.orderDate?.toDate() || 0;
@@ -59,19 +63,17 @@ const Admin = () => {
     }
   };
 
-  // স্ট্যাটাস আপডেট এবং স্টক কমানোর ফাংশন
+  // স্ট্যাটাস আপডেট এবং অটোমেটিক স্টক কমানোর ফাংশন
   const updateOrderStatus = async (order, newStatus) => {
     try {
-      // ১. অর্ডারের স্ট্যাটাস আপডেট করা
       const orderRef = doc(db, "orders", order.id);
       await updateDoc(orderRef, { status: newStatus });
 
-      // ২. যদি স্ট্যাটাস Delivered হয়, তাহলে ডেটাবেস থেকে স্টক কমানো
+      // স্ট্যাটাস Delivered হলে স্টক থেকে বিয়োগ হবে
       if (newStatus === 'Delivered') {
         for (const item of order.orderItems) {
           const productRef = doc(db, "products", item.id);
           await updateDoc(productRef, {
-            // increment দিয়ে নেগেটিভ ভ্যালু পাঠালে সেটি মেইন স্টক থেকে বিয়োগ হয়ে যাবে
             stock: increment(-item.quantity) 
           });
         }
@@ -94,7 +96,18 @@ const Admin = () => {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <h1 className="text-3xl font-bold text-gray-800 mb-8 text-center">অ্যাডমিন ড্যাশবোর্ড</h1>
+      
+      {/* হেডার ও লগআউট বাটন যুক্ত করা হলো */}
+      <div className="flex justify-between items-center mb-8 border-b pb-4">
+        <h1 className="text-3xl font-bold text-gray-800">অ্যাডমিন ড্যাশবোর্ড</h1>
+        
+        <button 
+          onClick={() => signOut(auth)}
+          className="bg-red-500 hover:bg-red-600 text-white px-5 py-2 rounded-md font-bold transition duration-300 shadow-md"
+        >
+          লগআউট করুন
+        </button>
+      </div>
 
       <div className="flex justify-center gap-4 mb-8">
         <button 
@@ -166,7 +179,6 @@ const Admin = () => {
 
                   {order.status !== 'Delivered' && (
                     <button 
-                      // এখানে শুধু ID এর বদলে পুরো order অবজেক্টটি পাঠানো হচ্ছে
                       onClick={() => updateOrderStatus(order, 'Delivered')}
                       className="w-full bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 rounded transition"
                     >
