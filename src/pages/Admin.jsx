@@ -1,15 +1,11 @@
 import { useState, useEffect } from 'react';
-// auth ইম্পোর্ট করা হলো
 import { db, auth } from '../firebase'; 
-// increment এবং ফায়ারস্টোরের অন্যান্য ফাংশন
 import { collection, addDoc, getDocs, doc, updateDoc, increment } from 'firebase/firestore';
-// লগআউট করার জন্য signOut ইম্পোর্ট
 import { signOut } from 'firebase/auth'; 
 
 const Admin = () => {
   const [activeTab, setActiveTab] = useState('orders'); 
 
-  // --- প্রোডাক্ট অ্যাড করার স্টেট ও ফাংশন ---
   const [product, setProduct] = useState({ name: '', price: '', stock: '', image: '' });
   const [isAddingProduct, setIsAddingProduct] = useState(false);
 
@@ -35,7 +31,6 @@ const Admin = () => {
     }
   };
 
-  // --- অর্ডার দেখার স্টেট ও ফাংশন ---
   const [orders, setOrders] = useState([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
 
@@ -48,7 +43,6 @@ const Admin = () => {
         ...doc.data()
       }));
       
-      // নতুন অর্ডারগুলো সবার উপরে দেখানোর জন্য সর্টিং
       ordersArray.sort((a, b) => {
         const dateA = a.orderDate?.toDate() || 0;
         const dateB = b.orderDate?.toDate() || 0;
@@ -63,23 +57,28 @@ const Admin = () => {
     }
   };
 
-  // স্ট্যাটাস আপডেট এবং অটোমেটিক স্টক কমানোর ফাংশন
   const updateOrderStatus = async (order, newStatus) => {
+    // সিকিউরিটি অ্যালার্ট (ভুল করে ক্যানসেল বাটন চাপলে আটকাতে)
+    if (newStatus === 'Cancelled') {
+      const isConfirm = window.confirm("আপনি কি নিশ্চিত যে এই অর্ডারটি ক্যানসেল করতে চান? ক্যানসেল করলে প্রোডাক্টের স্টক আবার ডেটাবেসে ফেরত যাবে।");
+      if (!isConfirm) return;
+    }
+
     try {
       const orderRef = doc(db, "orders", order.id);
       await updateDoc(orderRef, { status: newStatus });
 
-      // স্ট্যাটাস Delivered হলে স্টক থেকে বিয়োগ হবে
-      if (newStatus === 'Delivered') {
+      // যদি অর্ডার 'Cancelled' করা হয়, তবে স্টক আবার ডেটাবেসে যোগ (Increment) হয়ে যাবে!
+      if (newStatus === 'Cancelled') {
         for (const item of order.orderItems) {
           const productRef = doc(db, "products", item.id);
           await updateDoc(productRef, {
-            stock: increment(-item.quantity) 
+            stock: increment(item.quantity) // পজিটিভ ভ্যালু = স্টক ফেরত আসলো
           });
         }
       }
 
-      alert(`অর্ডারের স্ট্যাটাস '${newStatus}'-এ আপডেট করা হয়েছে এবং স্টক কমানো হয়েছে!`);
+      alert(`অর্ডারের স্ট্যাটাস '${newStatus}'-এ আপডেট করা হয়েছে!`);
       fetchOrders(); 
     } catch (error) {
       console.error("Error updating status: ", error);
@@ -93,14 +92,11 @@ const Admin = () => {
     }
   }, [activeTab]);
 
-
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       
-      {/* হেডার ও লগআউট বাটন যুক্ত করা হলো */}
       <div className="flex justify-between items-center mb-8 border-b pb-4">
         <h1 className="text-3xl font-bold text-gray-800">অ্যাডমিন ড্যাশবোর্ড</h1>
-        
         <button 
           onClick={() => signOut(auth)}
           className="bg-red-500 hover:bg-red-600 text-white px-5 py-2 rounded-md font-bold transition duration-300 shadow-md"
@@ -142,7 +138,7 @@ const Admin = () => {
                       <p className="font-bold text-gray-800">{order.customerInfo?.name}</p>
                       <p className="text-sm text-gray-600">{order.customerInfo?.phone}</p>
                     </div>
-                    <span className={`px-3 py-1 text-xs font-bold rounded-full ${order.status === 'Delivered' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                    <span className={`px-3 py-1 text-xs font-bold rounded-full ${order.status === 'Delivered' ? 'bg-green-100 text-green-700' : order.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
                       {order.status || 'Pending'}
                     </span>
                   </div>
@@ -177,13 +173,22 @@ const Admin = () => {
                     </div>
                   </div>
 
-                  {order.status !== 'Delivered' && (
-                    <button 
-                      onClick={() => updateOrderStatus(order, 'Delivered')}
-                      className="w-full bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 rounded transition"
-                    >
-                      Mark as Delivered
-                    </button>
+                  {/* বাটন গ্রুপ: Pending অবস্থায় থাকলে Delivered এবং Cancelled করার অপশন দেখাবে */}
+                  {order.status !== 'Delivered' && order.status !== 'Cancelled' && (
+                    <div className="flex gap-2 mt-4">
+                      <button 
+                        onClick={() => updateOrderStatus(order, 'Delivered')}
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 rounded transition"
+                      >
+                        Delivered
+                      </button>
+                      <button 
+                        onClick={() => updateOrderStatus(order, 'Cancelled')}
+                        className="flex-1 bg-red-500 hover:bg-red-600 text-white text-sm font-bold py-2 rounded transition"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   )}
                 </div>
               ))}

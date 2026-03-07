@@ -1,9 +1,9 @@
 import { useContext, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { CartContext } from '../context/CartContext';
-// ফায়ারবেস ইম্পোর্ট
 import { db } from '../firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+// doc, updateDoc, increment ইম্পোর্ট করা হলো
+import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
 
 const Checkout = () => {
   const { cart, cartTotal, clearCart } = useContext(CartContext);
@@ -32,7 +32,6 @@ const Checkout = () => {
     if (val.length <= 30) setFormData({ ...formData, trxId: val });
   };
 
-  // ফায়ারবেসে অর্ডার পাঠানোর ফাংশন
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
     if (formData.phone.length !== 11) return alert("১১ ডিজিটের সঠিক মোবাইল নম্বর দিন।");
@@ -43,7 +42,7 @@ const Checkout = () => {
     
     setIsLoading(true);
     try {
-      // 'orders' কালেকশনে ডেটা সেভ
+      // ১. 'orders' কালেকশনে অর্ডার সেভ করা
       await addDoc(collection(db, "orders"), {
         customerInfo: formData,
         orderItems: cart,
@@ -51,6 +50,15 @@ const Checkout = () => {
         status: "Pending",
         orderDate: serverTimestamp()
       });
+
+      // ২. অর্ডার কনফার্ম হওয়ার সাথে সাথেই মেইন স্টক থেকে প্রোডাক্টের পরিমাণ কমানো
+      for (const item of cart) {
+        const productRef = doc(db, "products", item.id);
+        await updateDoc(productRef, {
+          stock: increment(-item.quantity) // ডেটাবেস থেকে বিয়োগ হচ্ছে
+        });
+      }
+
       alert("ধন্যবাদ! আপনার অর্ডারটি সফলভাবে প্লেস হয়েছে।");
       clearCart();
       navigate('/');
@@ -79,19 +87,16 @@ const Checkout = () => {
       <h1 className="text-3xl font-bold text-gray-800 mb-8">চেকআউট</h1>
       <div className="flex flex-col lg:flex-row gap-8">
         
-        {/* ফর্ম সেকশন */}
         <div className="lg:w-2/3 bg-white rounded-lg shadow-md p-6">
           <form onSubmit={handlePlaceOrder} className="space-y-4">
             <div>
               <label className="block font-semibold mb-2">আপনার নাম *</label>
               <input type="text" name="name" value={formData.name} required onChange={handleNameChange} className="w-full border p-2 rounded" placeholder="সম্পূর্ণ নাম লিখুন" />
             </div>
-            
             <div>
               <label className="block font-semibold mb-2">মোবাইল নম্বর *</label>
               <input type="tel" name="phone" value={formData.phone} required onChange={(e) => handlePhoneNumberChange(e, 'phone')} className="w-full border p-2 rounded" placeholder="01XXXXXXXXX" />
             </div>
-            
             <div>
               <label className="block font-semibold mb-2">পূর্ণাঙ্গ ঠিকানা *</label>
               <textarea name="address" value={formData.address} required maxLength="200" onChange={handleInputChange} rows="3" className="w-full border p-2 rounded" placeholder="বাসা নং, রাস্তা, এলাকা, জেলা"></textarea>
@@ -127,7 +132,6 @@ const Checkout = () => {
           </form>
         </div>
 
-        {/* অর্ডার সামারি */}
         <div className="lg:w-1/3 bg-gray-50 rounded-lg shadow-md p-6 h-fit sticky top-24 border">
           <h2 className="text-xl font-bold border-b pb-4 mb-4">আপনার অর্ডার</h2>
           <div className="space-y-3 mb-4 max-h-64 overflow-y-auto">
