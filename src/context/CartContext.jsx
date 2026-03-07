@@ -5,7 +5,6 @@ export const CartContext = createContext();
 export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState([]);
 
-  // কার্টে যোগ করা
   const addToCart = (product) => {
     const existingItem = cart.find(item => item.id === product.id);
     if (existingItem) {
@@ -17,12 +16,10 @@ export const CartProvider = ({ children }) => {
     }
   };
 
-  // কার্ট থেকে রিমুভ করা
   const removeFromCart = (id) => {
     setCart(cart.filter(item => item.id !== id));
   };
 
-  // পরিমাণ (Quantity) আপডেট করা
   const updateQuantity = (id, type) => {
     setCart(cart.map(item => {
       if (item.id === id) {
@@ -36,12 +33,16 @@ export const CartProvider = ({ children }) => {
     }));
   };
 
-  // মোট সংখ্যা ও দাম হিসাব করা
+  // অর্ডার কনফার্ম হওয়ার পর কার্ট খালি করার ফাংশন
+  const clearCart = () => {
+    setCart([]);
+  };
+
   const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
   const cartTotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
 
   return (
-    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, cartCount, cartTotal }}>
+    <CartContext.Provider value={{ cart, addToCart, removeFromCart, updateQuantity, clearCart, cartCount, cartTotal }}>
       {children}
     </CartContext.Provider>
   );

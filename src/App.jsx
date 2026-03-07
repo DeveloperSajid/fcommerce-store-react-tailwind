@@ -1,7 +1,8 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Home from './pages/Home';
-import Cart from './pages/Cart'; // Cart পেজ ইম্পোর্ট করা হলো
+import Cart from './pages/Cart';
+import Checkout from './pages/Checkout'; // Checkout পেজ ইম্পোর্ট করা হলো
 import { CartProvider } from './context/CartContext';
 
 function App() {
@@ -13,8 +14,9 @@ function App() {
           <main className="flex-grow">
             <Routes>
               <Route path="/" element={<Home />} />
-              {/* Cart পেজের রাউট */}
               <Route path="/cart" element={<Cart />} />
+              {/* Checkout পেজের রাউট */}
+              <Route path="/checkout" element={<Checkout />} />
             </Routes>
           </main>
         </div>
