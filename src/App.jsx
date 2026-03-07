@@ -4,12 +4,13 @@ import Navbar from './components/Navbar';
 import Home from './pages/Home';
 import Checkout from './pages/Checkout';
 import Admin from './pages/Admin';
-import Login from './pages/Login'; // Login ইম্পোর্ট
+import Login from './pages/Login';
+// ProductDetails ইম্পোর্ট করা হলো
+import ProductDetails from './pages/ProductDetails'; 
 import CartDrawer from './components/CartDrawer';
 import { CartProvider } from './context/CartContext';
-import { AuthProvider, AuthContext } from './context/AuthContext'; // Auth যুক্ত করা হলো
+import { AuthProvider, AuthContext } from './context/AuthContext';
 
-// সিকিউরিটি গার্ড (প্রাইভেট রাউট)
 const PrivateRoute = ({ children }) => {
   const { currentUser } = useContext(AuthContext);
   return currentUser ? children : <Navigate to="/login" />;
@@ -26,10 +27,13 @@ function App() {
             <main className="flex-grow">
               <Routes>
                 <Route path="/" element={<Home />} />
+                
+                {/* নতুন প্রোডাক্ট ডিটেইলস রাউট */}
+                <Route path="/product/:id" element={<ProductDetails />} />
+                
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="/login" element={<Login />} />
                 
-                {/* অ্যাডমিন পেজটিকে PrivateRoute দিয়ে লক করে দেওয়া হলো */}
                 <Route 
                   path="/admin" 
                   element={

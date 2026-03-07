@@ -1,52 +1,53 @@
 import { useContext } from 'react';
+import { Link } from 'react-router-dom';
 import { CartContext } from '../context/CartContext';
 
 const ProductCard = ({ product }) => {
-  // Context থেকে addToCart ফাংশনটি নিয়ে আসা হলো
   const { addToCart } = useContext(CartContext);
 
   return (
-    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300 flex flex-col">
+    <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300 flex flex-col group">
       
-      {/* প্রোডাক্টের ছবি */}
-      <img 
-        src={product.image} 
-        alt={product.name} 
-        className="w-full h-48 object-cover" 
-      />
+      {/* ছবির ওপর ক্লিক করলে ডিটেইলস পেজে যাবে */}
+      <Link to={`/product/${product.id}`} className="block overflow-hidden relative cursor-pointer">
+        <img 
+          src={product.image} 
+          alt={product.name} 
+          className="w-full h-56 object-cover group-hover:scale-105 transition-transform duration-500" 
+        />
+        {/* স্টক আউট ব্যাজ */}
+        {product.stock <= 0 && (
+          <div className="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded">
+            Stock Out
+          </div>
+        )}
+      </Link>
       
-      {/* প্রোডাক্টের বিস্তারিত তথ্য */}
       <div className="p-4 flex flex-col flex-grow">
-        <h3 className="text-lg font-semibold text-gray-800 mb-2 line-clamp-2">
-          {product.name}
-        </h3>
+        {/* নামের ওপর ক্লিক করলেও ডিটেইলস পেজে যাবে */}
+        <Link to={`/product/${product.id}`}>
+          <h3 className="text-lg font-semibold text-gray-800 mb-2 line-clamp-2 hover:text-blue-600 transition">
+            {product.name}
+          </h3>
+        </Link>
         
-        <div className="flex justify-between items-center mb-4 mt-auto">
-          {/* দাম */}
+        <div className="mt-auto flex justify-between items-center pt-2">
           <span className="text-xl font-bold text-blue-600">৳{product.price}</span>
           
-          {/* স্টকের পরিমাণ (স্টক থাকলে সবুজ, না থাকলে লাল) */}
-          <span className={`text-xs font-bold px-2 py-1 rounded ${
-            product.stock > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-          }`}>
-            {product.stock > 0 ? `Stock: ${product.stock}` : 'Out of Stock'}
-          </span>
+          <button 
+            onClick={() => addToCart(product)}
+            disabled={product.stock <= 0}
+            className={`px-4 py-2 rounded font-semibold transition-colors ${
+              product.stock > 0 
+                ? 'bg-gray-800 hover:bg-black text-white active:scale-95' 
+                : 'bg-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
+          >
+            {product.stock > 0 ? 'Add to Cart' : 'Stock Out'}
+          </button>
         </div>
-        
-        {/* Add to Cart বাটন */}
-        <button 
-          onClick={() => addToCart(product)}
-          disabled={product.stock === 0}
-          className={`w-full py-2 rounded-md font-semibold text-white transition-colors duration-300 ${
-            product.stock > 0 
-              ? 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800' 
-              : 'bg-gray-400 cursor-not-allowed'
-          }`}
-        >
-          {product.stock > 0 ? 'Add to Cart' : 'Out of Stock'}
-        </button>
       </div>
-
+      
     </div>
   );
 };
