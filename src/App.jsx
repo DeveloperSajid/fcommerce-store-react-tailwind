@@ -5,6 +5,7 @@ import Home from './pages/Home';
 import Checkout from './pages/Checkout';
 import Admin from './pages/Admin';
 import Login from './pages/Login';
+import TrackOrder from './pages/TrackOrder';
 // ProductDetails ইম্পোর্ট করা হলো
 import ProductDetails from './pages/ProductDetails'; 
 import CartDrawer from './components/CartDrawer';
@@ -15,6 +16,8 @@ const PrivateRoute = ({ children }) => {
   const { currentUser } = useContext(AuthContext);
   return currentUser ? children : <Navigate to="/login" />;
 };
+
+// ... আপনার PrivateRoute ফাংশন ...
 
 function App() {
   return (
@@ -27,21 +30,14 @@ function App() {
             <main className="flex-grow">
               <Routes>
                 <Route path="/" element={<Home />} />
-                
-                {/* নতুন প্রোডাক্ট ডিটেইলস রাউট */}
                 <Route path="/product/:id" element={<ProductDetails />} />
-                
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="/login" element={<Login />} />
                 
-                <Route 
-                  path="/admin" 
-                  element={
-                    <PrivateRoute>
-                      <Admin />
-                    </PrivateRoute>
-                  } 
-                />
+                {/* নতুন যুক্ত করা ট্র্যাক অর্ডার রাউট */}
+                <Route path="/track-order" element={<TrackOrder />} />
+                
+                <Route path="/admin" element={<PrivateRoute><Admin /></PrivateRoute>} />
               </Routes>
             </main>
           </div>
