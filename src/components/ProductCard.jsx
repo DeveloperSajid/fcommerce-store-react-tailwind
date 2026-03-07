@@ -1,6 +1,10 @@
-import React from 'react';
+import { useContext } from 'react';
+import { CartContext } from '../context/CartContext';
 
 const ProductCard = ({ product }) => {
+  // Context থেকে addToCart ফাংশনটি নিয়ে আসা হলো
+  const { addToCart } = useContext(CartContext);
+
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-xl transition-shadow duration-300 flex flex-col">
       
@@ -8,7 +12,7 @@ const ProductCard = ({ product }) => {
       <img 
         src={product.image} 
         alt={product.name} 
-        className="w-full h-48 object-cover"
+        className="w-full h-48 object-cover" 
       />
       
       {/* প্রোডাক্টের বিস্তারিত তথ্য */}
@@ -31,6 +35,7 @@ const ProductCard = ({ product }) => {
         
         {/* Add to Cart বাটন */}
         <button 
+          onClick={() => addToCart(product)}
           disabled={product.stock === 0}
           className={`w-full py-2 rounded-md font-semibold text-white transition-colors duration-300 ${
             product.stock > 0 
