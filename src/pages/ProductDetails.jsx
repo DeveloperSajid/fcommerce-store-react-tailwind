@@ -6,7 +6,7 @@ import { CartContext } from '../context/CartContext';
 import { FaArrowLeft } from 'react-icons/fa';
 
 const ProductDetails = () => {
-  const { id } = useParams(); // URL থেকে প্রোডাক্টের আইডি নিচ্ছে
+  const { id } = useParams(); 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const { addToCart } = useContext(CartContext);
@@ -54,7 +54,6 @@ const ProductDetails = () => {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
-      {/* ব্যাক বাটন */}
       <button 
         onClick={() => navigate(-1)} 
         className="flex items-center gap-2 text-gray-600 hover:text-blue-600 mb-6 transition font-semibold"
@@ -64,7 +63,6 @@ const ProductDetails = () => {
 
       <div className="bg-white rounded-xl shadow-lg overflow-hidden flex flex-col md:flex-row">
         
-        {/* বাম পাশ: বড় ছবি */}
         <div className="md:w-1/2 p-4">
           <img 
             src={product.image} 
@@ -73,7 +71,6 @@ const ProductDetails = () => {
           />
         </div>
 
-        {/* ডান পাশ: বিস্তারিত তথ্য */}
         <div className="md:w-1/2 p-8 flex flex-col justify-center">
           <h1 className="text-3xl font-bold text-gray-800 mb-4 leading-tight">{product.name}</h1>
           <p className="text-3xl font-bold text-blue-600 mb-6">৳{product.price}</p>
@@ -84,14 +81,14 @@ const ProductDetails = () => {
             </span>
           </div>
 
+          {/* এখানে ফায়ারবেস থেকে আসা ডায়নামিক বিবরণ দেখানো হচ্ছে */}
           <div className="mb-8">
             <h3 className="text-lg font-bold text-gray-800 mb-2">প্রোডাক্টের বিবরণ:</h3>
-            <p className="text-gray-600 leading-relaxed">
-              এটি একটি প্রিমিয়াম কোয়ালিটির প্রোডাক্ট। চমৎকার ডিজাইন এবং মজবুত বিল্ড কোয়ালিটি একে করে তুলেছে অনন্য। আপনার দৈনন্দিন কাজকে আরও সহজ ও আনন্দদায়ক করতে আজই অর্ডার করুন!
+            <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">
+              {product.description ? product.description : 'এই প্রোডাক্টের কোনো বিস্তারিত বিবরণ দেওয়া নেই।'}
             </p>
           </div>
 
-          {/* Add to Cart বাটন */}
           <button 
             onClick={() => addToCart(product)}
             disabled={product.stock <= 0}

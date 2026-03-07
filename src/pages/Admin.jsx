@@ -4,11 +4,10 @@ import { collection, addDoc, getDocs, doc, updateDoc, increment } from 'firebase
 import { signOut } from 'firebase/auth'; 
 
 const Admin = () => {
-  // এখন ৩টি ট্যাব: orders, addProduct, manageProducts
   const [activeTab, setActiveTab] = useState('orders'); 
 
-  // --- ১. প্রোডাক্ট অ্যাড করার স্টেট ---
-  const [product, setProduct] = useState({ name: '', price: '', stock: '', image: '' });
+  // --- ১. প্রোডাক্ট অ্যাড করার স্টেট (description যুক্ত করা হলো) ---
+  const [product, setProduct] = useState({ name: '', price: '', stock: '', image: '', description: '' });
   const [isAddingProduct, setIsAddingProduct] = useState(false);
 
   const handleAddInputChange = (e) => setProduct({ ...product, [e.target.name]: e.target.value });
@@ -21,10 +20,11 @@ const Admin = () => {
         name: product.name,
         price: Number(product.price),
         stock: Number(product.stock),
-        image: product.image
+        image: product.image,
+        description: product.description // বিবরণ ডেটাবেসে পাঠানো হচ্ছে
       });
       alert("🎉 প্রোডাক্ট সফলভাবে ডেটাবেসে যোগ করা হয়েছে!");
-      setProduct({ name: '', price: '', stock: '', image: '' });
+      setProduct({ name: '', price: '', stock: '', image: '', description: '' });
     } catch (error) {
       console.error(error);
       alert("দুঃখিত, প্রোডাক্ট যোগ করতে সমস্যা হয়েছে।");
@@ -53,7 +53,7 @@ const Admin = () => {
 
   const updateOrderStatus = async (order, newStatus) => {
     if (newStatus === 'Cancelled') {
-      const isConfirm = window.confirm("আপনি কি নিশ্চিত যে এই অর্ডারটি ক্যানসেল করতে চান? ক্যানসেল করলে প্রোডাক্টের স্টক আবার ডেটাবেসে ফেরত যাবে।");
+      const isConfirm = window.confirm("আপনি কি নিশ্চিত যে এই অর্ডারটি ক্যানসেল করতে চান?");
       if (!isConfirm) return;
     }
     try {
@@ -74,10 +74,10 @@ const Admin = () => {
     }
   };
 
-  // --- ৩. প্রোডাক্ট ম্যানেজমেন্ট (এডিট/স্টক আপডেট) স্টেট ---
+  // --- ৩. প্রোডাক্ট ম্যানেজমেন্ট (এডিট/স্টক আপডেট) ---
   const [allProducts, setAllProducts] = useState([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
-  const [editingProduct, setEditingProduct] = useState(null); // যে প্রোডাক্ট এডিট করা হচ্ছে
+  const [editingProduct, setEditingProduct] = useState(null); 
   const [isUpdating, setIsUpdating] = useState(false);
 
   const fetchAllProducts = async () => {
@@ -106,11 +106,12 @@ const Admin = () => {
         name: editingProduct.name,
         price: Number(editingProduct.price),
         stock: Number(editingProduct.stock),
-        image: editingProduct.image
+        image: editingProduct.image,
+        description: editingProduct.description || '' // আপডেট করার সময় বিবরণ পাঠানো হচ্ছে
       });
       alert("প্রোডাক্ট সফলভাবে আপডেট করা হয়েছে!");
-      setEditingProduct(null); // এডিট মোড বন্ধ করা
-      fetchAllProducts(); // লিস্ট রিফ্রেশ করা
+      setEditingProduct(null); 
+      fetchAllProducts(); 
     } catch (error) {
       console.error(error);
       alert("আপডেট করতে সমস্যা হয়েছে।");
@@ -119,7 +120,6 @@ const Admin = () => {
     }
   };
 
-  // ট্যাব পরিবর্তন হলে ডেটা ফেচ হবে
   useEffect(() => {
     if (activeTab === 'orders') fetchOrders();
     if (activeTab === 'manageProducts') fetchAllProducts();
@@ -129,7 +129,6 @@ const Admin = () => {
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       
-      {/* হেডার */}
       <div className="flex justify-between items-center mb-8 border-b pb-4">
         <h1 className="text-3xl font-bold text-gray-800">অ্যাডমিন ড্যাশবোর্ড</h1>
         <button onClick={() => signOut(auth)} className="bg-red-500 hover:bg-red-600 text-white px-5 py-2 rounded-md font-bold transition duration-300 shadow-md">
@@ -137,29 +136,12 @@ const Admin = () => {
         </button>
       </div>
 
-      {/* ৩টি ট্যাবের নেভিগেশন */}
       <div className="flex flex-wrap justify-center gap-3 mb-8">
-        <button 
-          onClick={() => setActiveTab('orders')}
-          className={`px-6 py-2 rounded-md font-bold transition duration-300 ${activeTab === 'orders' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-600 border hover:bg-gray-100'}`}
-        >
-          কাস্টমার অর্ডার
-        </button>
-        <button 
-          onClick={() => setActiveTab('addProduct')}
-          className={`px-6 py-2 rounded-md font-bold transition duration-300 ${activeTab === 'addProduct' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-600 border hover:bg-gray-100'}`}
-        >
-          নতুন প্রোডাক্ট যোগ
-        </button>
-        <button 
-          onClick={() => { setActiveTab('manageProducts'); setEditingProduct(null); }}
-          className={`px-6 py-2 rounded-md font-bold transition duration-300 ${activeTab === 'manageProducts' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-600 border hover:bg-gray-100'}`}
-        >
-          প্রোডাক্ট ম্যানেজমেন্ট (এডিট)
-        </button>
+        <button onClick={() => setActiveTab('orders')} className={`px-6 py-2 rounded-md font-bold transition duration-300 ${activeTab === 'orders' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-600 border hover:bg-gray-100'}`}>কাস্টমার অর্ডার</button>
+        <button onClick={() => setActiveTab('addProduct')} className={`px-6 py-2 rounded-md font-bold transition duration-300 ${activeTab === 'addProduct' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-600 border hover:bg-gray-100'}`}>নতুন প্রোডাক্ট যোগ</button>
+        <button onClick={() => { setActiveTab('manageProducts'); setEditingProduct(null); }} className={`px-6 py-2 rounded-md font-bold transition duration-300 ${activeTab === 'manageProducts' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-600 border hover:bg-gray-100'}`}>প্রোডাক্ট ম্যানেজমেন্ট (এডিট)</button>
       </div>
 
-      {/* --- ট্যাব ১: কাস্টমার অর্ডার --- */}
       {activeTab === 'orders' && (
         <div className="bg-white rounded-lg shadow-lg p-6">
           <h2 className="text-xl font-bold text-gray-800 border-b pb-4 mb-6">সর্বশেষ অর্ডারসমূহ</h2>
@@ -177,26 +159,16 @@ const Admin = () => {
                       <p className="font-bold text-gray-800">{order.customerInfo?.name}</p>
                       <p className="text-sm text-gray-600">{order.customerInfo?.phone}</p>
                     </div>
-                    <span className={`px-3 py-1 text-xs font-bold rounded-full ${order.status === 'Delivered' ? 'bg-green-100 text-green-700' : order.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                      {order.status || 'Pending'}
-                    </span>
+                    <span className={`px-3 py-1 text-xs font-bold rounded-full ${order.status === 'Delivered' ? 'bg-green-100 text-green-700' : order.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{order.status || 'Pending'}</span>
                   </div>
                   <div className="text-sm text-gray-700 mb-4">
                     <p><span className="font-semibold">ঠিকানা:</span> {order.customerInfo?.address}</p>
-                    <p className="mt-1"><span className="font-semibold">পেমেন্ট:</span> <span className={order.customerInfo?.paymentMethod === 'bkash' ? 'text-pink-600 font-bold ml-1' : 'ml-1'}>{order.customerInfo?.paymentMethod === 'bkash' ? 'bKash' : 'Cash on Delivery'}</span></p>
-                    {order.customerInfo?.paymentMethod === 'bkash' && (
-                      <div className="bg-pink-50 p-2 mt-2 rounded text-xs border border-pink-100">
-                        <p>নম্বর: {order.customerInfo?.bkashNumber}</p>
-                        <p>TrxID: <span className="font-mono">{order.customerInfo?.trxId}</span></p>
-                      </div>
-                    )}
                   </div>
                   <div className="bg-gray-50 p-3 rounded mb-4">
                     <p className="font-bold text-sm mb-2 border-b pb-1">অর্ডার করা প্রোডাক্ট:</p>
                     {order.orderItems?.map(item => (
                       <div key={item.id} className="flex justify-between text-xs mb-1 text-gray-600">
-                        <span>{item.name} (x{item.quantity})</span>
-                        <span>৳{item.price * item.quantity}</span>
+                        <span>{item.name} (x{item.quantity})</span><span>৳{item.price * item.quantity}</span>
                       </div>
                     ))}
                     <div className="flex justify-between font-bold text-sm mt-2 pt-2 border-t">
@@ -216,7 +188,6 @@ const Admin = () => {
         </div>
       )}
 
-      {/* --- ট্যাব ২: নতুন প্রোডাক্ট যোগ --- */}
       {activeTab === 'addProduct' && (
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-2xl mx-auto">
           <h2 className="text-xl font-bold text-gray-800 mb-6 text-center border-b pb-4">নতুন প্রোডাক্ট আপলোড করুন</h2>
@@ -238,13 +209,14 @@ const Admin = () => {
             <div>
               <label className="block text-gray-700 font-bold mb-2">ছবির লিংক (URL)</label>
               <input type="url" name="image" value={product.image} required onChange={handleAddInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://example.com/image.jpg" />
-              {product.image && (
-                <div className="mt-3">
-                  <p className="text-sm text-gray-500 mb-1">ছবির প্রিভিউ:</p>
-                  <img src={product.image} alt="Preview" className="h-32 object-cover rounded border" />
-                </div>
-              )}
             </div>
+            
+            {/* নতুন যুক্ত হওয়া প্রোডাক্টের বিবরণ বক্স */}
+            <div>
+              <label className="block text-gray-700 font-bold mb-2">প্রোডাক্টের বিবরণ</label>
+              <textarea name="description" value={product.description} required onChange={handleAddInputChange} rows="4" className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="প্রোডাক্টের সুবিধা, সাইজ বা অন্যান্য বিস্তারিত তথ্য লিখুন..."></textarea>
+            </div>
+
             <button type="submit" disabled={isAddingProduct} className={`w-full text-white font-bold py-3 rounded-md mt-4 transition ${isAddingProduct ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}>
               {isAddingProduct ? 'আপলোড হচ্ছে...' : 'প্রোডাক্ট আপলোড করুন'}
             </button>
@@ -252,22 +224,12 @@ const Admin = () => {
         </div>
       )}
 
-      {/* --- ট্যাব ৩: প্রোডাক্ট ম্যানেজমেন্ট (নতুন ফিচার) --- */}
       {activeTab === 'manageProducts' && (
         <div className="bg-white rounded-lg shadow-lg p-6">
-          <h2 className="text-xl font-bold text-gray-800 border-b pb-4 mb-6">
-            {editingProduct ? 'প্রোডাক্ট এডিট করুন' : 'সকল প্রোডাক্ট'}
-          </h2>
-
+          <h2 className="text-xl font-bold text-gray-800 border-b pb-4 mb-6">{editingProduct ? 'প্রোডাক্ট এডিট করুন' : 'সকল প্রোডাক্ট'}</h2>
           {editingProduct ? (
-            /* এডিট করার ফর্ম */
             <div className="max-w-2xl mx-auto">
-              <button 
-                onClick={() => setEditingProduct(null)} 
-                className="mb-6 text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-2"
-              >
-                ← ফিরে যান
-              </button>
+              <button onClick={() => setEditingProduct(null)} className="mb-6 text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-2">← ফিরে যান</button>
               <form onSubmit={handleUpdateProduct} className="space-y-5 bg-gray-50 p-6 rounded-lg border">
                 <div>
                   <label className="block text-gray-700 font-bold mb-2">প্রোডাক্টের নাম</label>
@@ -286,15 +248,20 @@ const Admin = () => {
                 <div>
                   <label className="block text-gray-700 font-bold mb-2">ছবির লিংক (URL)</label>
                   <input type="url" name="image" value={editingProduct.image} required onChange={handleEditInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                  <img src={editingProduct.image} alt="Preview" className="h-32 mt-3 object-cover rounded border" />
                 </div>
+                
+                {/* এডিট ফর্মে প্রোডাক্টের বিবরণ বক্স */}
+                <div>
+                  <label className="block text-gray-700 font-bold mb-2">প্রোডাক্টের বিবরণ</label>
+                  <textarea name="description" value={editingProduct.description || ''} onChange={handleEditInputChange} rows="4" className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+
                 <button type="submit" disabled={isUpdating} className={`w-full text-white font-bold py-3 rounded-md mt-4 transition ${isUpdating ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'}`}>
                   {isUpdating ? 'আপডেট হচ্ছে...' : 'পরিবর্তন সেভ করুন'}
                 </button>
               </form>
             </div>
           ) : (
-            /* সব প্রোডাক্টের লিস্ট */
             isLoadingProducts ? (
               <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div></div>
             ) : allProducts.length === 0 ? (
@@ -309,11 +276,7 @@ const Admin = () => {
                       <p><span className="font-semibold">দাম:</span> ৳{prod.price}</p>
                       <p><span className="font-semibold">স্টক:</span> <span className={prod.stock > 0 ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>{prod.stock} টি</span></p>
                     </div>
-                    {/* এডিট বাটন */}
-                    <button 
-                      onClick={() => setEditingProduct(prod)} 
-                      className="mt-auto pt-3 pb-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded w-full font-bold transition"
-                    >
+                    <button onClick={() => setEditingProduct(prod)} className="mt-auto pt-3 pb-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded w-full font-bold transition">
                       এডিট করুন
                     </button>
                   </div>
