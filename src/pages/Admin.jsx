@@ -6,8 +6,11 @@ import { signOut } from 'firebase/auth';
 const Admin = () => {
   const [activeTab, setActiveTab] = useState('orders'); 
 
-  // --- ১. প্রোডাক্ট অ্যাড করার স্টেট (description যুক্ত করা হলো) ---
-  const [product, setProduct] = useState({ name: '', price: '', stock: '', image: '', description: '' });
+  // ক্যাটাগরির লিস্ট
+  const categoriesList = ['Electronics', 'Gadgets', 'Fashion', 'Home Appliances', 'Others'];
+
+  // --- ১. প্রোডাক্ট অ্যাড করার স্টেট (category যুক্ত করা হলো) ---
+  const [product, setProduct] = useState({ name: '', price: '', stock: '', image: '', description: '', category: 'Electronics' });
   const [isAddingProduct, setIsAddingProduct] = useState(false);
 
   const handleAddInputChange = (e) => setProduct({ ...product, [e.target.name]: e.target.value });
@@ -21,10 +24,11 @@ const Admin = () => {
         price: Number(product.price),
         stock: Number(product.stock),
         image: product.image,
-        description: product.description // বিবরণ ডেটাবেসে পাঠানো হচ্ছে
+        description: product.description,
+        category: product.category // ক্যাটাগরি ডেটাবেসে যাচ্ছে
       });
       alert("🎉 প্রোডাক্ট সফলভাবে ডেটাবেসে যোগ করা হয়েছে!");
-      setProduct({ name: '', price: '', stock: '', image: '', description: '' });
+      setProduct({ name: '', price: '', stock: '', image: '', description: '', category: 'Electronics' });
     } catch (error) {
       console.error(error);
       alert("দুঃখিত, প্রোডাক্ট যোগ করতে সমস্যা হয়েছে।");
@@ -107,7 +111,8 @@ const Admin = () => {
         price: Number(editingProduct.price),
         stock: Number(editingProduct.stock),
         image: editingProduct.image,
-        description: editingProduct.description || '' // আপডেট করার সময় বিবরণ পাঠানো হচ্ছে
+        description: editingProduct.description || '',
+        category: editingProduct.category || 'Others' // আপডেট করার সময় ক্যাটাগরি পাঠানো হচ্ছে
       });
       alert("প্রোডাক্ট সফলভাবে আপডেট করা হয়েছে!");
       setEditingProduct(null); 
@@ -128,7 +133,6 @@ const Admin = () => {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
-      
       <div className="flex justify-between items-center mb-8 border-b pb-4">
         <h1 className="text-3xl font-bold text-gray-800">অ্যাডমিন ড্যাশবোর্ড</h1>
         <button onClick={() => signOut(auth)} className="bg-red-500 hover:bg-red-600 text-white px-5 py-2 rounded-md font-bold transition duration-300 shadow-md">
@@ -144,6 +148,7 @@ const Admin = () => {
 
       {activeTab === 'orders' && (
         <div className="bg-white rounded-lg shadow-lg p-6">
+          {/* ... অর্ডার লিস্টের কোড আগের মতোই আছে ... */}
           <h2 className="text-xl font-bold text-gray-800 border-b pb-4 mb-6">সর্বশেষ অর্ডারসমূহ</h2>
           {isLoadingOrders ? (
             <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div></div>
@@ -194,27 +199,37 @@ const Admin = () => {
           <form onSubmit={handleAddProduct} className="space-y-5">
             <div>
               <label className="block text-gray-700 font-bold mb-2">প্রোডাক্টের নাম</label>
-              <input type="text" name="name" value={product.name} required onChange={handleAddInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="যেমন: স্মার্ট ফিটনেস ওয়াচ" />
+              <input type="text" name="name" value={product.name} required onChange={handleAddInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div>
                 <label className="block text-gray-700 font-bold mb-2">দাম (টাকা)</label>
-                <input type="number" name="price" value={product.price} required onChange={handleAddInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="যেমন: 1250" />
+                <input type="number" name="price" value={product.price} required onChange={handleAddInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
                 <label className="block text-gray-700 font-bold mb-2">স্টক (পরিমাণ)</label>
-                <input type="number" name="stock" value={product.stock} required onChange={handleAddInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="যেমন: 10" />
+                <input type="number" name="stock" value={product.stock} required onChange={handleAddInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              </div>
+              {/* ক্যাটাগরি অপশন */}
+              <div>
+                <label className="block text-gray-700 font-bold mb-2">ক্যাটাগরি</label>
+                <select name="category" value={product.category} onChange={handleAddInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                  {categoriesList.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
               </div>
             </div>
+
             <div>
               <label className="block text-gray-700 font-bold mb-2">ছবির লিংক (URL)</label>
-              <input type="url" name="image" value={product.image} required onChange={handleAddInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://example.com/image.jpg" />
+              <input type="url" name="image" value={product.image} required onChange={handleAddInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             
-            {/* নতুন যুক্ত হওয়া প্রোডাক্টের বিবরণ বক্স */}
             <div>
               <label className="block text-gray-700 font-bold mb-2">প্রোডাক্টের বিবরণ</label>
-              <textarea name="description" value={product.description} required onChange={handleAddInputChange} rows="4" className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="প্রোডাক্টের সুবিধা, সাইজ বা অন্যান্য বিস্তারিত তথ্য লিখুন..."></textarea>
+              <textarea name="description" value={product.description} required onChange={handleAddInputChange} rows="4" className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
             </div>
 
             <button type="submit" disabled={isAddingProduct} className={`w-full text-white font-bold py-3 rounded-md mt-4 transition ${isAddingProduct ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}>
@@ -235,7 +250,7 @@ const Admin = () => {
                   <label className="block text-gray-700 font-bold mb-2">প্রোডাক্টের নাম</label>
                   <input type="text" name="name" value={editingProduct.name} required onChange={handleEditInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                   <div>
                     <label className="block text-gray-700 font-bold mb-2">দাম (টাকা)</label>
                     <input type="number" name="price" value={editingProduct.price} required onChange={handleEditInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
@@ -244,18 +259,24 @@ const Admin = () => {
                     <label className="block text-gray-700 font-bold mb-2">বর্তমান স্টক</label>
                     <input type="number" name="stock" value={editingProduct.stock} required onChange={handleEditInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
+                  {/* এডিট ফর্মে ক্যাটাগরি অপশন */}
+                  <div>
+                    <label className="block text-gray-700 font-bold mb-2">ক্যাটাগরি</label>
+                    <select name="category" value={editingProduct.category || 'Others'} onChange={handleEditInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                      {categoriesList.map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-gray-700 font-bold mb-2">ছবির লিংক (URL)</label>
                   <input type="url" name="image" value={editingProduct.image} required onChange={handleEditInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
-                
-                {/* এডিট ফর্মে প্রোডাক্টের বিবরণ বক্স */}
                 <div>
                   <label className="block text-gray-700 font-bold mb-2">প্রোডাক্টের বিবরণ</label>
                   <textarea name="description" value={editingProduct.description || ''} onChange={handleEditInputChange} rows="4" className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                 </div>
-
                 <button type="submit" disabled={isUpdating} className={`w-full text-white font-bold py-3 rounded-md mt-4 transition ${isUpdating ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'}`}>
                   {isUpdating ? 'আপডেট হচ্ছে...' : 'পরিবর্তন সেভ করুন'}
                 </button>
@@ -269,7 +290,11 @@ const Admin = () => {
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {allProducts.map(prod => (
-                  <div key={prod.id} className="border p-4 rounded-lg flex flex-col hover:shadow-md transition bg-gray-50">
+                  <div key={prod.id} className="border p-4 rounded-lg flex flex-col hover:shadow-md transition bg-gray-50 relative">
+                    {/* কার্ডের উপরে ক্যাটাগরি ব্যাজ */}
+                    <span className="absolute top-2 right-2 bg-gray-800 text-white text-[10px] px-2 py-1 rounded-full z-10">
+                      {prod.category || 'Others'}
+                    </span>
                     <img src={prod.image} alt={prod.name} className="h-40 w-full object-cover rounded mb-3 border" />
                     <h3 className="font-bold text-gray-800 line-clamp-2 h-12">{prod.name}</h3>
                     <div className="mt-2 text-sm">
