@@ -11,32 +11,44 @@ const Checkout = () => {
     name: '',
     phone: '',
     address: '',
-    paymentMethod: 'cod', // ডিফল্ট: Cash on Delivery
+    paymentMethod: 'cod',
     bkashNumber: '',
     trxId: ''
   });
 
-  // ইনপুট পরিবর্তনের ফাংশন
+  // সাধারণ ইনপুট পরিবর্তনের ফাংশন
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  // ফোন নম্বরের জন্য বিশেষ ফাংশন (শুধুমাত্র সংখ্যা এবং সর্বোচ্চ ১১ ডিজিট)
+  const handlePhoneChange = (e) => {
+    // যেকোনো অক্ষর বা স্পেস বাদ দিয়ে শুধু সংখ্যা (0-9) ফিল্টার করা হচ্ছে
+    const onlyNums = e.target.value.replace(/[^0-9]/g, '');
+    
+    // ১১ ডিজিটের বেশি টাইপ করতে দেবে না
+    if (onlyNums.length <= 11) {
+      setFormData({ ...formData, phone: onlyNums });
+    }
   };
 
   // অর্ডার সাবমিট করার ফাংশন
   const handlePlaceOrder = (e) => {
     e.preventDefault();
     
-    // পরবর্তীতে এখানে আমরা ডেটাবেসে (Firebase) ডেটা পাঠানোর কোড লিখব
+    // ফাইনাল চেকিং: ১১ ডিজিট না হলে সাবমিট হবে না
+    if (formData.phone.length !== 11) {
+      alert("অনুগ্রহ করে ১১ ডিজিটের সঠিক মোবাইল নম্বর দিন।");
+      return;
+    }
+    
     console.log("Order Details:", { items: cart, total: cartTotal, customer: formData });
     
-    // ডেমো সাকসেস মেসেজ
     alert("ধন্যবাদ! আপনার অর্ডারটি সফলভাবে প্লেস হয়েছে।");
-    
-    // কার্ট খালি করে হোমপেজে পাঠিয়ে দেওয়া
     clearCart();
     navigate('/');
   };
 
-  // যদি কার্ট খালি থাকে, তবে চেকআউটে আসতে দেবে না
   if (cart.length === 0) {
     return (
       <div className="container mx-auto px-4 py-16 text-center">
@@ -59,17 +71,38 @@ const Checkout = () => {
           <form onSubmit={handlePlaceOrder} className="space-y-4">
             <div>
               <label className="block text-gray-700 font-semibold mb-2">আপনার নাম *</label>
-              <input type="text" name="name" required onChange={handleInputChange} className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="সম্পূর্ণ নাম লিখুন" />
+              <input type="text" name="name" value={formData.name} required onChange={handleInputChange} className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="সম্পূর্ণ নাম লিখুন" />
             </div>
             
+            {/* ফোন নম্বর ইনপুট এবং ভ্যালিডেশন মেসেজ */}
             <div>
               <label className="block text-gray-700 font-semibold mb-2">মোবাইল নম্বর *</label>
-              <input type="tel" name="phone" required onChange={handleInputChange} className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="01XXX-XXXXXX" />
+              <input 
+                type="tel" 
+                name="phone" 
+                value={formData.phone} 
+                required 
+                onChange={handlePhoneChange} 
+                className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                placeholder="01XXXXXXXXX" 
+              />
+              
+              {/* রিয়েল-টাইম ফিডব্যাক মেসেজ */}
+              {formData.phone.length > 0 && formData.phone.length < 11 && (
+                <p className="text-sm text-red-500 mt-1 font-medium">
+                  আর {11 - formData.phone.length} টি সংখ্যা দিতে হবে
+                </p>
+              )}
+              {formData.phone.length === 11 && (
+                <p className="text-sm text-green-600 mt-1 font-bold">
+                  ✓ সঠিক ফোন নম্বর
+                </p>
+              )}
             </div>
             
             <div>
               <label className="block text-gray-700 font-semibold mb-2">পূর্ণাঙ্গ ঠিকানা *</label>
-              <textarea name="address" required onChange={handleInputChange} rows="3" className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="বাসা নং, রাস্তা, এলাকা, জেলা"></textarea>
+              <textarea name="address" value={formData.address} required onChange={handleInputChange} rows="3" className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="বাসা নং, রাস্তা, এলাকা, জেলা"></textarea>
             </div>
 
             {/* পেমেন্ট মেথড সিলেকশন */}
@@ -88,18 +121,26 @@ const Checkout = () => {
               </div>
             </div>
 
-            {/* যদি বিকাশ সিলেক্ট করে, তবে এই অংশটি দেখাবে */}
+            {/* বিকাশ কন্ডিশনাল ইনপুট */}
             {formData.paymentMethod === 'bkash' && (
-              <div className="bg-pink-50 p-4 rounded-md border border-pink-200 mt-3">
+              <div className="bg-pink-50 p-4 rounded-md border border-pink-200 mt-3 animate-fade-in">
                 <p className="text-sm text-gray-700 mb-3">অনুগ্রহ করে আমাদের পার্সোনাল নম্বরে (01XXXXXXXXX) টাকা Send Money করুন এবং নিচের তথ্যগুলো দিন।</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <input type="text" name="bkashNumber" required={formData.paymentMethod === 'bkash'} onChange={handleInputChange} className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-pink-500" placeholder="যে নম্বর থেকে টাকা পাঠিয়েছেন" />
-                  <input type="text" name="trxId" required={formData.paymentMethod === 'bkash'} onChange={handleInputChange} className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-pink-500" placeholder="Transaction ID (TrxID)" />
+                  <input type="text" name="bkashNumber" value={formData.bkashNumber} required={formData.paymentMethod === 'bkash'} onChange={handleInputChange} className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-pink-500" placeholder="যে নম্বর থেকে টাকা পাঠিয়েছেন" />
+                  <input type="text" name="trxId" value={formData.trxId} required={formData.paymentMethod === 'bkash'} onChange={handleInputChange} className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-pink-500" placeholder="Transaction ID (TrxID)" />
                 </div>
               </div>
             )}
 
-            <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-md mt-6 transition duration-300">
+            <button 
+              type="submit" 
+              disabled={formData.phone.length > 0 && formData.phone.length < 11}
+              className={`w-full text-white font-bold py-3 rounded-md mt-6 transition duration-300 ${
+                formData.phone.length > 0 && formData.phone.length < 11 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-blue-600 hover:bg-blue-700'
+              }`}
+            >
               অর্ডার কনফার্ম করুন (৳{cartTotal})
             </button>
           </form>
