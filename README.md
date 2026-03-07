@@ -1,3 +1,10 @@
+# Run this Website
+```
+npm install
+npm run dev
+```
+
+
 # Use this for the React, Tailwind CSS, and JSON version.
 
 ### GitHub Repository Name: fcommerce-store-react-tailwind
