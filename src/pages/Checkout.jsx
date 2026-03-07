@@ -6,37 +6,40 @@ const Checkout = () => {
   const { cart, cartTotal, clearCart } = useContext(CartContext);
   const navigate = useNavigate();
 
-  // ফর্মের ডেটা ধরে রাখার স্টেট
   const [formData, setFormData] = useState({
     name: '',
-    phone: '',
+    phone: '01', // ডিফল্টভাবে '01' সেট করা হলো
     address: '',
     paymentMethod: 'cod',
     bkashNumber: '',
     trxId: ''
   });
 
-  // সাধারণ ইনপুট পরিবর্তনের ফাংশন
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // ফোন নম্বরের জন্য বিশেষ ফাংশন (শুধুমাত্র সংখ্যা এবং সর্বোচ্চ ১১ ডিজিট)
+  // ফোন নম্বরের জন্য বিশেষ ফাংশন (শুধুমাত্র সংখ্যা, '01' ফিক্সড এবং সর্বোচ্চ ১১ ডিজিট)
   const handlePhoneChange = (e) => {
-    // যেকোনো অক্ষর বা স্পেস বাদ দিয়ে শুধু সংখ্যা (0-9) ফিল্টার করা হচ্ছে
-    const onlyNums = e.target.value.replace(/[^0-9]/g, '');
-    
+    let inputValue = e.target.value;
+
+    // যেকোনো অক্ষর বা স্পেস বাদ দিয়ে শুধু সংখ্যা (0-9) রাখা হচ্ছে
+    let onlyNums = inputValue.replace(/[^0-9]/g, '');
+
+    // যদি ইউজার '01' মুছে ফেলতে চায়, তবে জোর করে '01' বসিয়ে দেওয়া হবে
+    if (!onlyNums.startsWith('01')) {
+      onlyNums = '01'; 
+    }
+
     // ১১ ডিজিটের বেশি টাইপ করতে দেবে না
     if (onlyNums.length <= 11) {
       setFormData({ ...formData, phone: onlyNums });
     }
   };
 
-  // অর্ডার সাবমিট করার ফাংশন
   const handlePlaceOrder = (e) => {
     e.preventDefault();
     
-    // ফাইনাল চেকিং: ১১ ডিজিট না হলে সাবমিট হবে না
     if (formData.phone.length !== 11) {
       alert("অনুগ্রহ করে ১১ ডিজিটের সঠিক মোবাইল নম্বর দিন।");
       return;
@@ -83,12 +86,12 @@ const Checkout = () => {
                 value={formData.phone} 
                 required 
                 onChange={handlePhoneChange} 
-                className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium" 
                 placeholder="01XXXXXXXXX" 
               />
               
               {/* রিয়েল-টাইম ফিডব্যাক মেসেজ */}
-              {formData.phone.length > 0 && formData.phone.length < 11 && (
+              {formData.phone.length > 2 && formData.phone.length < 11 && (
                 <p className="text-sm text-red-500 mt-1 font-medium">
                   আর {11 - formData.phone.length} টি সংখ্যা দিতে হবে
                 </p>
@@ -134,9 +137,9 @@ const Checkout = () => {
 
             <button 
               type="submit" 
-              disabled={formData.phone.length > 0 && formData.phone.length < 11}
+              disabled={formData.phone.length < 11}
               className={`w-full text-white font-bold py-3 rounded-md mt-6 transition duration-300 ${
-                formData.phone.length > 0 && formData.phone.length < 11 
+                formData.phone.length < 11 
                   ? 'bg-gray-400 cursor-not-allowed' 
                   : 'bg-blue-600 hover:bg-blue-700'
               }`}
