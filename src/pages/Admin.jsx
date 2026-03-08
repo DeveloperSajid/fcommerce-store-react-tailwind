@@ -8,7 +8,7 @@ const Admin = () => {
   const [activeTab, setActiveTab] = useState('orders'); 
   const categoriesList = ['Electronics', 'Gadgets', 'Fashion', 'Home Appliances', 'Others'];
 
-  // --- ১. প্রোডাক্ট যোগ করার স্টেট ---
+  // --- ১. প্রোডাক্ট যোগ করার স্টেট (৩টি ছবির স্টেট যুক্ত করা হলো) ---
   const [product, setProduct] = useState({ name: '', price: '', stock: '', description: '', category: 'Electronics', image: '', image2: '', image3: '' });
   const [imageFile, setImageFile] = useState(null); 
   const [isAddingProduct, setIsAddingProduct] = useState(false);
@@ -27,10 +27,19 @@ const Admin = () => {
         await uploadBytes(imageRef, imageFile);
         imageUrl = await getDownloadURL(imageRef);
       }
+      
+      // ৩টি ছবিই ডেটাবেসে যাবে
       await addDoc(collection(db, "products"), {
-        name: product.name, price: Number(product.price), stock: Number(product.stock), description: product.description,
-        category: product.category, image: imageUrl, image2: product.image2, image3: product.image3    
+        name: product.name, 
+        price: Number(product.price), 
+        stock: Number(product.stock), 
+        description: product.description,
+        category: product.category, 
+        image: imageUrl,
+        image2: product.image2,
+        image3: product.image3
       });
+
       alert("🎉 প্রোডাক্ট সফলভাবে যোগ করা হয়েছে!");
       setProduct({ name: '', price: '', stock: '', description: '', category: 'Electronics', image: '', image2: '', image3: '' });
       setImageFile(null); 
@@ -105,11 +114,19 @@ const Admin = () => {
         await uploadBytes(imageRef, editImageFile);
         imageUrl = await getDownloadURL(imageRef);
       }
+      
+      // ৩টি ছবিই ডেটাবেসে আপডেট হবে
       await updateDoc(doc(db, "products", editingProduct.id), {
-        name: editingProduct.name, price: Number(editingProduct.price), stock: Number(editingProduct.stock),
-        description: editingProduct.description || '', category: editingProduct.category || 'Others',
-        image: imageUrl, image2: editingProduct.image2 || '', image3: editingProduct.image3 || ''
+        name: editingProduct.name, 
+        price: Number(editingProduct.price), 
+        stock: Number(editingProduct.stock),
+        description: editingProduct.description || '', 
+        category: editingProduct.category || 'Others',
+        image: imageUrl,
+        image2: editingProduct.image2 || '',
+        image3: editingProduct.image3 || ''
       });
+
       alert("প্রোডাক্ট আপডেট হয়েছে!");
       setEditingProduct(null); setEditImageFile(null); fetchAllProducts(); 
     } catch (error) { console.error(error); alert("আপডেট করতে সমস্যা হয়েছে।"); } finally { setIsUpdating(false); }
@@ -121,7 +138,7 @@ const Admin = () => {
     dhaka: 120, 
     others: 150,
     storePickupName: 'Sajid Tech & Finance',
-    storePickupAddress: 'বগুড়া সদর, বগুড়া'
+    storePickupAddress: 'বগুড়া সদর, বগুড়া।'
   });
   const [isUpdatingSettings, setIsUpdatingSettings] = useState(false);
 
@@ -229,7 +246,6 @@ const Admin = () => {
         </div>
       )}
 
-      {/* Settings Tab UI */}
       {activeTab === 'settings' && (
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-2xl mx-auto border-t-4 border-blue-600">
           <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center border-b pb-4">ওয়েবসাইট সেটিংস</h2>
@@ -262,7 +278,7 @@ const Admin = () => {
                 </div>
                 <div>
                   <label className="block text-indigo-800 font-bold mb-2">পূর্ণাঙ্গ ঠিকানা</label>
-                  <input type="text" value={storeSettings.storePickupAddress} required onChange={(e) => setStoreSettings({...storeSettings, storePickupAddress: e.target.value})} className="w-full border p-3 rounded font-semibold text-gray-800 focus:ring-2 focus:ring-indigo-400 focus:outline-none" placeholder="যেমন: বগুড়া সদর, বগুড়া" />
+                  <input type="text" value={storeSettings.storePickupAddress} required onChange={(e) => setStoreSettings({...storeSettings, storePickupAddress: e.target.value})} className="w-full border p-3 rounded font-semibold text-gray-800 focus:ring-2 focus:ring-indigo-400 focus:outline-none" placeholder="যেমন: বগুড়া সদর, বগুড়া।" />
                 </div>
               </div>
             </div>
@@ -274,6 +290,7 @@ const Admin = () => {
         </div>
       )}
 
+      {/* নতুন প্রোডাক্ট আপলোড (৩টি ছবির অপশনসহ) */}
       {activeTab === 'addProduct' && (
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-2xl mx-auto">
           <h2 className="text-xl font-bold border-b pb-4 mb-6 text-center">নতুন প্রোডাক্ট আপলোড</h2>
@@ -284,19 +301,34 @@ const Admin = () => {
               <div><label className="block font-bold mb-2">স্টক *</label><input type="number" name="stock" value={product.stock} required onChange={handleAddInputChange} className="w-full border p-3 rounded" /></div>
               <div><label className="block font-bold mb-2">ক্যাটাগরি *</label><select name="category" value={product.category} onChange={handleAddInputChange} className="w-full border p-3 rounded bg-white">{categoriesList.map(cat => <option key={cat} value={cat}>{cat}</option>)}</select></div>
             </div>
+            
             <div className="space-y-4">
               <div className="border border-blue-200 p-5 rounded-lg bg-blue-50 bg-opacity-30">
                 <h3 className="font-bold mb-3 border-b pb-2">প্রধান ছবি (আবশ্যক) *</h3>
-                <input type="url" name="image" value={product.image} onChange={handleAddInputChange} className="w-full border p-2 rounded mb-2" placeholder="URL দিন" />
+                <input type="url" name="image" value={product.image} onChange={handleAddInputChange} className="w-full border p-2 rounded mb-2 bg-white" placeholder="URL দিন" />
                 <input type="file" accept="image/*" onChange={handleImageChange} className="w-full text-sm" />
               </div>
+              
+              <div className="border border-gray-200 p-4 rounded-lg bg-gray-50">
+                <h3 className="font-bold text-gray-600 mb-2 border-b pb-2">২য় ছবি (ঐচ্ছিক)</h3>
+                <input type="url" name="image2" value={product.image2} onChange={handleAddInputChange} className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" placeholder="২য় ছবির লিংক (URL) দিন" />
+                {product.image2 && <img src={product.image2} alt="Preview 2" className="h-16 mt-2 rounded border" />}
+              </div>
+
+              <div className="border border-gray-200 p-4 rounded-lg bg-gray-50">
+                <h3 className="font-bold text-gray-600 mb-2 border-b pb-2">৩য় ছবি (ঐচ্ছিক)</h3>
+                <input type="url" name="image3" value={product.image3} onChange={handleAddInputChange} className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" placeholder="৩য় ছবির লিংক (URL) দিন" />
+                {product.image3 && <img src={product.image3} alt="Preview 3" className="h-16 mt-2 rounded border" />}
+              </div>
             </div>
+
             <div><label className="block font-bold mb-2">বিবরণ *</label><textarea name="description" value={product.description} required onChange={handleAddInputChange} rows="3" className="w-full border p-3 rounded"></textarea></div>
             <button type="submit" disabled={isAddingProduct} className={`w-full text-white font-bold py-3 rounded mt-4 ${isAddingProduct ? 'bg-gray-400' : 'bg-blue-600'}`}>{isAddingProduct ? 'আপলোড হচ্ছে...' : 'আপলোড করুন'}</button>
           </form>
         </div>
       )}
 
+      {/* প্রোডাক্ট ম্যানেজমেন্ট (৩টি ছবির অপশনসহ) */}
       {activeTab === 'manageProducts' && (
         <div className="bg-white rounded-lg shadow-lg p-6">
           <h2 className="text-xl font-bold border-b pb-4 mb-6">{editingProduct ? 'এডিট করুন' : 'সকল প্রোডাক্ট'}</h2>
@@ -309,11 +341,27 @@ const Admin = () => {
                   <div><label className="block font-bold mb-2">দাম</label><input type="number" name="price" value={editingProduct.price} required onChange={(e)=>setEditingProduct({...editingProduct, price: e.target.value})} className="w-full border p-3 rounded" /></div>
                   <div><label className="block font-bold mb-2">স্টক</label><input type="number" name="stock" value={editingProduct.stock} required onChange={(e)=>setEditingProduct({...editingProduct, stock: e.target.value})} className="w-full border p-3 rounded" /></div>
                 </div>
-                <div className="border p-4 rounded bg-white">
-                  <h3 className="font-bold mb-2">প্রধান ছবি এডিট</h3>
-                  <input type="url" value={editingProduct.image} onChange={(e)=>setEditingProduct({...editingProduct, image: e.target.value})} className="w-full border p-2 rounded mb-2" />
-                  <input type="file" accept="image/*" onChange={(e) => setEditImageFile(e.target.files[0])} className="w-full text-sm" />
+                
+                <div className="space-y-4">
+                  <div className="border p-4 rounded bg-white">
+                    <h3 className="font-bold mb-2">প্রধান ছবি এডিট</h3>
+                    <input type="url" value={editingProduct.image} onChange={(e)=>setEditingProduct({...editingProduct, image: e.target.value})} className="w-full border p-2 rounded mb-2" />
+                    <input type="file" accept="image/*" onChange={(e) => setEditImageFile(e.target.files[0])} className="w-full text-sm" />
+                  </div>
+                  
+                  <div className="border border-gray-200 p-4 rounded-lg bg-white">
+                    <h3 className="font-bold text-gray-600 mb-2 border-b pb-2">২য় ছবি এডিট (ঐচ্ছিক)</h3>
+                    <input type="url" name="image2" value={editingProduct.image2 || ''} onChange={(e)=>setEditingProduct({...editingProduct, image2: e.target.value})} className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="২য় ছবির লিংক (URL)" />
+                    {editingProduct.image2 && <img src={editingProduct.image2} alt="Preview 2" className="h-16 mt-2 rounded border" />}
+                  </div>
+
+                  <div className="border border-gray-200 p-4 rounded-lg bg-white">
+                    <h3 className="font-bold text-gray-600 mb-2 border-b pb-2">৩য় ছবি এডিট (ঐচ্ছিক)</h3>
+                    <input type="url" name="image3" value={editingProduct.image3 || ''} onChange={(e)=>setEditingProduct({...editingProduct, image3: e.target.value})} className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="৩য় ছবির লিংক (URL)" />
+                    {editingProduct.image3 && <img src={editingProduct.image3} alt="Preview 3" className="h-16 mt-2 rounded border" />}
+                  </div>
                 </div>
+
                 <div><label className="block font-bold mb-2">বিবরণ</label><textarea value={editingProduct.description || ''} onChange={(e)=>setEditingProduct({...editingProduct, description: e.target.value})} rows="3" className="w-full border p-3 rounded"></textarea></div>
                 <button type="submit" disabled={isUpdating} className={`w-full text-white font-bold py-3 rounded mt-4 ${isUpdating ? 'bg-gray-400' : 'bg-green-600'}`}>পরিবর্তন সেভ করুন</button>
               </form>

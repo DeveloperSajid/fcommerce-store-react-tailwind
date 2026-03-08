@@ -16,7 +16,7 @@ const Checkout = () => {
     dhaka: 120, 
     others: 150,
     storePickupName: 'Sajid Tech & Finance',
-    storePickupAddress: 'বগুড়া সদর, বগুড়া'
+    storePickupAddress: 'বগুড়া সদর, বগুড়া।'
   });
 
   const [formData, setFormData] = useState({
