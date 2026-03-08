@@ -4,19 +4,20 @@ import { CartContext } from '../context/CartContext';
 import { db } from '../firebase';
 import { collection, addDoc, serverTimestamp, doc, updateDoc, increment, getDoc } from 'firebase/firestore';
 import emailjs from '@emailjs/browser';
+import toast from 'react-hot-toast'; // Toast ইম্পোর্ট করা আছে
 
 const Checkout = () => {
   const { cart, cartTotal, clearCart } = useContext(CartContext);
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   
-  // ডেটাবেস থেকে পাওয়া সেটিংস (ডেলিভারি চার্জ এবং স্টোর পিকআপ অ্যাড্রেস)
+  // ডেটাবেস থেকে পাওয়া সেটিংস (ডেলিভারি চার্জ এবং স্টোর পিকআপ অ্যাড্রেস)
   const [storeSettings, setStoreSettings] = useState({ 
     bogura: 60, 
     dhaka: 120, 
     others: 150,
     storePickupName: 'Sajid Tech & Finance',
-    storePickupAddress: 'বগুড়া সদর, বগুড়া।'
+    storePickupAddress: 'বগুড়া সদর, বগুড়া।'
   });
 
   const [formData, setFormData] = useState({
@@ -59,18 +60,22 @@ const Checkout = () => {
 
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
-    if (formData.phone.length !== 11) return alert("১১ ডিজিটের সঠিক মোবাইল নম্বর দিন।");
+    
+    // alert এর বদলে toast.error ব্যবহার করা হলো
+    if (formData.phone.length !== 11) return toast.error("১১ ডিজিটের সঠিক মোবাইল নম্বর দিন।");
     if (formData.paymentMethod === 'bkash') {
-      if (formData.bkashNumber.length !== 11) return alert("১১ ডিজিটের সঠিক বিকাশ নম্বর দিন।");
-      if (formData.trxId.length === 0) return alert("Transaction ID দিন।");
+      if (formData.bkashNumber.length !== 11) return toast.error("১১ ডিজিটের সঠিক বিকাশ নম্বর দিন।");
+      if (formData.trxId.length === 0) return toast.error("Transaction ID দিন।");
     }
     
     setIsLoading(true);
+    // অর্ডার প্রসেস হওয়ার সময় একটি সুন্দর লোডিং টোস্ট দেখাবে
+    const loadingToast = toast.loading("অর্ডার প্রসেস হচ্ছে, অনুগ্রহ করে অপেক্ষা করুন...");
 
     const deliveryFee = formData.deliveryMethod === 'storePickup' ? 0 : storeSettings[formData.deliveryLocation];
     const grandTotal = cartTotal + deliveryFee;
 
-    // ডায়নামিক স্টোর পিকআপের ঠিকানা
+    // ডায়নামিক স্টোর পিকআপের ঠিকানা
     const finalAddress = formData.deliveryMethod === 'storePickup' 
       ? `স্টোর পিকআপ: ${storeSettings.storePickupName}, ${storeSettings.storePickupAddress}` 
       : formData.address;
@@ -115,13 +120,15 @@ const Checkout = () => {
         console.error("Email error: ", emailError);
       }
 
-      alert("ধন্যবাদ! আপনার অর্ডারটি সফলভাবে প্লেস হয়েছে।");
+      // সাকসেস মেসেজ এবং লোডিং টোস্ট রিমুভ করা
+      toast.success("ধন্যবাদ! আপনার অর্ডারটি সফলভাবে প্লেস হয়েছে। 🎉", { id: loadingToast });
       clearCart();
       navigate('/');
       
     } catch (error) {
       console.error(error);
-      alert("দুঃখিত, অর্ডার প্লেস হয়নি। ইন্টারনেট কানেকশন চেক করুন।");
+      // এরর মেসেজ
+      toast.error("দুঃখিত, অর্ডার প্লেস হয়নি। ইন্টারনেট কানেকশন চেক করুন।", { id: loadingToast });
     } finally {
       setIsLoading(false);
     }
@@ -188,7 +195,7 @@ const Checkout = () => {
                 <div className="flex flex-col gap-3">
                   <label className="flex items-center gap-2 cursor-pointer bg-white p-2 rounded border">
                     <input type="radio" name="deliveryLocation" value="bogura" checked={formData.deliveryLocation === 'bogura'} onChange={handleInputChange} className="w-4 h-4" />
-                    <span className="font-bold text-gray-700 flex-grow">বগুড়া সদর</span>
+                    <span className="font-bold text-gray-700 flex-grow">বগুড়া সদর</span>
                     <span className="font-bold text-blue-600">৳{storeSettings.bogura}</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer bg-white p-2 rounded border">
@@ -228,7 +235,7 @@ const Checkout = () => {
               <div className="bg-pink-50 p-4 rounded-md mt-3 border border-pink-100">
                 <p className="text-sm mb-3 text-pink-800">আমাদের পার্সোনাল নম্বরে (01XXXXXXXXX) Send Money করুন।</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <input type="text" name="bkashNumber" value={formData.bkashNumber} required onChange={(e) => handlePhoneNumberChange(e, 'bkashNumber')} className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-pink-400" placeholder="যে নম্বর থেকে টাকা পাঠিয়েছেন" />
+                  <input type="text" name="bkashNumber" value={formData.bkashNumber} required onChange={(e) => handlePhoneNumberChange(e, 'bkashNumber')} className="border p-2 rounded focus:outline-none focus:ring-2 focus:ring-pink-400" placeholder="যে নম্বর থেকে টাকা পাঠিয়েছেন" />
                   <input type="text" name="trxId" value={formData.trxId} required onChange={handleTrxIdChange} className="border p-2 rounded uppercase focus:outline-none focus:ring-2 focus:ring-pink-400" placeholder="Transaction ID" />
                 </div>
               </div>

@@ -1,54 +1,105 @@
-import { createContext, useState } from 'react';
+import { createContext, useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 
 export const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
-  const [cart, setCart] = useState([]);
-  
-  // কার্ট ওপেন/ক্লোজ করার জন্য নতুন স্টেট
-  const [isCartOpen, setIsCartOpen] = useState(false); 
+  const [cart, setCart] = useState(() => {
+    const savedCart = localStorage.getItem('cart');
+    return savedCart ? JSON.parse(savedCart) : [];
+  });
+  const [isCartOpen, setIsCartOpen] = useState(false);
 
+  useEffect(() => {
+    localStorage.setItem('cart', JSON.stringify(cart));
+  }, [cart]);
+
+  // ১. কার্টে প্রোডাক্ট যোগ করার ফাংশন (ফিক্সড - এক ক্লিকে একবারই মেসেজ আসবে)
   const addToCart = (product) => {
-    const existingItem = cart.find(item => item.id === product.id);
-    if (existingItem) {
-      setCart(cart.map(item => 
-        item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-      ));
-    } else {
-      setCart([...cart, { ...product, quantity: 1 }]);
+    if (product.stock <= 0) {
+      toast.dismiss(); // আগের সব টোস্ট মুছে ফেলবে
+      toast.error("দুঃখিত, এই প্রোডাক্টের স্টক শেষ!");
+      return;
     }
-    // প্রোডাক্ট কার্টে যোগ হওয়ার সাথে সাথেই কার্ট ড্রয়ারটি ওপেন হয়ে যাবে
-    setIsCartOpen(true); 
+
+    setCart(prevCart => {
+      const existingItem = prevCart.find(item => item.id === product.id);
+      
+      if (existingItem) {
+        if (existingItem.quantity >= product.stock) {
+          toast.dismiss();
+          toast.error("স্টকে আর পর্যাপ্ত প্রোডাক্ট নেই!");
+          return prevCart;
+        }
+        
+        toast.dismiss(); // ডুপ্লিকেট মেসেজ রোধ করতে dismiss ব্যবহার করা হয়েছে
+        toast.success("প্রোডাক্টের পরিমাণ বাড়ানো হয়েছে!");
+        return prevCart.map(item => 
+          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
+        );
+      }
+      
+      toast.dismiss();
+      toast.success("কার্টে যোগ করা হয়েছে! 🛒");
+      return [...prevCart, { ...product, quantity: 1 }];
+    });
+    
+    setIsCartOpen(true);
   };
 
-  const removeFromCart = (id) => {
-    setCart(cart.filter(item => item.id !== id));
+  const removeFromCart = (productId) => {
+    setCart(prevCart => prevCart.filter(item => item.id !== productId));
+    toast.dismiss();
+    toast.error("কার্ট থেকে রিমুভ করা হয়েছে!");
   };
 
-  const updateQuantity = (id, type) => {
-    setCart(cart.map(item => {
-      if (item.id === id) {
-        if (type === 'increase' && item.quantity < item.stock) {
-          return { ...item, quantity: item.quantity + 1 };
-        } else if (type === 'decrease' && item.quantity > 1) {
+  // ২. প্লাস বাটন (কার্ট ড্রয়ারের জন্য - ফিক্সড)
+  const increaseQuantity = (productId, stock) => {
+    setCart(prevCart => {
+      const updatedCart = prevCart.map(item => {
+        if (item.id === productId) {
+          if (item.quantity < stock) {
+            toast.dismiss();
+            toast.success("পরিমাণ বাড়ানো হয়েছে!");
+            return { ...item, quantity: item.quantity + 1 };
+          } else {
+            toast.dismiss();
+            toast.error("স্টকে আর পর্যাপ্ত প্রোডাক্ট নেই!");
+            return item;
+          }
+        }
+        return item;
+      });
+      return updatedCart;
+    });
+  };
+
+  // ৩. মাইনাস বাটন (কার্ট ড্রয়ারের জন্য - ফিক্সড)
+  const decreaseQuantity = (productId) => {
+    setCart(prevCart => {
+      const updatedCart = prevCart.map(item => {
+        if (item.id === productId && item.quantity > 1) {
+          toast.dismiss();
+          toast.success("পরিমাণ কমানো হয়েছে!");
           return { ...item, quantity: item.quantity - 1 };
         }
-      }
-      return item;
-    }));
+        return item;
+      });
+      return updatedCart;
+    });
   };
 
   const clearCart = () => {
     setCart([]);
   };
 
-  const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
   const cartTotal = cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+  const cartItemCount = cart.reduce((count, item) => count + item.quantity, 0);
 
   return (
     <CartContext.Provider value={{ 
-      cart, addToCart, removeFromCart, updateQuantity, clearCart, cartCount, cartTotal,
-      isCartOpen, setIsCartOpen // নতুন স্টেটগুলো এখানে পাস করা হলো
+      cart, addToCart, removeFromCart, increaseQuantity, decreaseQuantity, clearCart, 
+      cartTotal, cartItemCount, isCartOpen, setIsCartOpen 
     }}>
       {children}
     </CartContext.Provider>
