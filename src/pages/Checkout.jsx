@@ -1,19 +1,35 @@
-import { useContext, useState } from 'react';
+import { useContext, useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { CartContext } from '../context/CartContext';
 import { db } from '../firebase';
-import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp, doc, updateDoc, increment, getDoc } from 'firebase/firestore';
 import emailjs from '@emailjs/browser';
 
 const Checkout = () => {
   const { cart, cartTotal, clearCart } = useContext(CartContext);
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  
+  // ডেটাবেস থেকে পাওয়া ডেলিভারি চার্জ রাখার স্টেট
+  const [deliveryCharges, setDeliveryCharges] = useState({ bogura: 60, dhaka: 120, others: 150 });
 
-  // নতুন স্টেট: deliveryMethod (ডিফল্ট: homeDelivery)
   const [formData, setFormData] = useState({
-    name: '', phone: '01', address: '', paymentMethod: 'cod', bkashNumber: '01', trxId: '', deliveryMethod: 'homeDelivery'
+    name: '', phone: '01', address: '', paymentMethod: 'cod', bkashNumber: '01', trxId: '', 
+    deliveryMethod: 'homeDelivery', deliveryLocation: 'bogura' // নতুন স্টেট
   });
+
+  // পেজ লোড হলে ডেটাবেস থেকে বর্তমান ডেলিভারি চার্জগুলো নিয়ে আসবে
+  useEffect(() => {
+    const fetchDeliveryCharges = async () => {
+      try {
+        const docSnap = await getDoc(doc(db, "settings", "delivery"));
+        if (docSnap.exists()) {
+          setDeliveryCharges(docSnap.data());
+        }
+      } catch (error) { console.error("Error fetching charges:", error); }
+    };
+    fetchDeliveryCharges();
+  }, []);
 
   const handleInputChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
 
@@ -43,23 +59,31 @@ const Checkout = () => {
     
     setIsLoading(true);
 
-    // লজিক: যদি স্টোর পিকআপ হয়, তবে ঠিকানা হিসেবে অটোমেটিক শপের অ্যাড্রেস বসে যাবে
+    // ১. ডেলিভারি চার্জ এবং সর্বমোট বিল ক্যালকুলেশন
+    const deliveryFee = formData.deliveryMethod === 'storePickup' ? 0 : deliveryCharges[formData.deliveryLocation];
+    const grandTotal = cartTotal + deliveryFee;
+
+    // ২. স্টোর পিকআপের ঠিকানা
     const finalAddress = formData.deliveryMethod === 'storePickup' 
       ? 'স্টোর পিকআপ: Sajid Tech & Finance, বগুড়া সদর, বগুড়া' 
       : formData.address;
 
     try {
+      // ৩. ডেটাবেসে অর্ডার সেভ করা (নতুন চার্জসহ)
       await addDoc(collection(db, "orders"), {
         customerInfo: {
           ...formData,
-          address: finalAddress // ফাইনাল অ্যাড্রেস ডেটাবেসে পাঠানো হচ্ছে
+          address: finalAddress 
         },
         orderItems: cart,
         totalAmount: cartTotal,
+        deliveryFee: deliveryFee, // ডেলিভারি চার্জ সেভ করা হচ্ছে
+        grandTotal: grandTotal,   // সর্বমোট বিল সেভ করা হচ্ছে
         status: "Pending",
         orderDate: serverTimestamp()
       });
 
+      // ৪. স্টক কমানো
       for (const item of cart) {
         const productRef = doc(db, "products", item.id);
         await updateDoc(productRef, {
@@ -67,20 +91,21 @@ const Checkout = () => {
         });
       }
 
+      // ৫. EmailJS দিয়ে নোটিফিকেশন পাঠানো (আপনার দেওয়া ক্রেডেনশিয়াল)
       try {
         const templateParams = {
           customer_name: formData.name,
           customer_phone: formData.phone,
-          customer_address: finalAddress, // ইমেইলেও শপের নাম চলে যাবে
+          customer_address: finalAddress,
           payment_method: formData.paymentMethod,
-          total_amount: cartTotal,
+          total_amount: grandTotal, // ইমেইলে গ্র্যান্ড টোটাল যাবে
         };
         
         await emailjs.send(
-            'service_foi8w12',     // আপনার Service ID বসান
-          'template_sav7hna',    // আপনার Template ID বসান
+          'service_foi8w12',     // আপনার Service ID
+          'template_sav7hna',    // আপনার Template ID
           templateParams, 
-          'A5tzlb51wbGgiSFRI'      // আপনার Public Key বসান
+          'A5tzlb51wbGgiSFRI'    // আপনার Public Key
         );
       } catch (emailError) {
         console.error("Email limit reached or error: ", emailError);
@@ -112,6 +137,10 @@ const Checkout = () => {
     (formData.deliveryMethod === 'storePickup' || formData.address.length > 0) &&
     (formData.paymentMethod === 'cod' || (formData.paymentMethod === 'bkash' && formData.bkashNumber.length === 11 && formData.trxId.length > 0));
 
+  // বর্তমান ডেলিভারি ফি এবং গ্র্যান্ড টোটাল হিসাব (UI তে দেখানোর জন্য)
+  const currentDeliveryFee = formData.deliveryMethod === 'storePickup' ? 0 : deliveryCharges[formData.deliveryLocation];
+  const currentGrandTotal = cartTotal + currentDeliveryFee;
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       <h1 className="text-3xl font-bold text-gray-800 mb-8">চেকআউট</h1>
@@ -128,7 +157,7 @@ const Checkout = () => {
               <input type="tel" name="phone" value={formData.phone} required onChange={(e) => handlePhoneNumberChange(e, 'phone')} className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="01XXXXXXXXX" />
             </div>
 
-            {/* --- নতুন: ডেলিভারি মেথড সিলেকশন --- */}
+            {/* --- ডেলিভারি মেথড সিলেকশন --- */}
             <div className="pt-2">
               <label className="block font-bold mb-3 text-gray-800">ডেলিভারি মেথড সিলেক্ট করুন *</label>
               <div className="flex flex-col sm:flex-row gap-4 mb-2">
@@ -153,11 +182,32 @@ const Checkout = () => {
               </div>
             )}
 
-            {/* যদি হোম ডেলিভারি হয়, তবে কাস্টমারের ঠিকানা চাইবে */}
+            {/* যদি হোম ডেলিভারি হয়, তবে কাস্টমারের জেলা এবং ঠিকানা চাইবে */}
             {formData.deliveryMethod === 'homeDelivery' && (
-              <div>
-                <label className="block font-semibold mb-2">পূর্ণাঙ্গ ঠিকানা *</label>
-                <textarea name="address" value={formData.address} required maxLength="200" onChange={handleInputChange} rows="3" className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="বাসা নং, রাস্তা, এলাকা, জেলা"></textarea>
+              <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 mb-4">
+                <label className="block font-bold text-blue-800 mb-3">আপনার জেলা/এলাকা সিলেক্ট করুন *</label>
+                <div className="flex flex-col gap-3">
+                  <label className="flex items-center gap-2 cursor-pointer bg-white p-2 rounded border">
+                    <input type="radio" name="deliveryLocation" value="bogura" checked={formData.deliveryLocation === 'bogura'} onChange={handleInputChange} className="w-4 h-4" />
+                    <span className="font-bold text-gray-700 flex-grow">বগুড়া সদর</span>
+                    <span className="font-bold text-blue-600">৳{deliveryCharges.bogura}</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer bg-white p-2 rounded border">
+                    <input type="radio" name="deliveryLocation" value="dhaka" checked={formData.deliveryLocation === 'dhaka'} onChange={handleInputChange} className="w-4 h-4" />
+                    <span className="font-bold text-gray-700 flex-grow">ঢাকা সিটি</span>
+                    <span className="font-bold text-blue-600">৳{deliveryCharges.dhaka}</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer bg-white p-2 rounded border">
+                    <input type="radio" name="deliveryLocation" value="others" checked={formData.deliveryLocation === 'others'} onChange={handleInputChange} className="w-4 h-4" />
+                    <span className="font-bold text-gray-700 flex-grow">অন্যান্য জেলা</span>
+                    <span className="font-bold text-blue-600">৳{deliveryCharges.others}</span>
+                  </label>
+                </div>
+                
+                <div className="mt-4">
+                  <label className="block font-semibold mb-2 text-sm text-gray-700">পূর্ণাঙ্গ ঠিকানা *</label>
+                  <textarea name="address" value={formData.address} required maxLength="200" onChange={handleInputChange} rows="2" className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="বাসা নং, রাস্তা, এলাকা, জেলা"></textarea>
+                </div>
               </div>
             )}
 
@@ -185,25 +235,34 @@ const Checkout = () => {
               </div>
             )}
 
-            <button type="submit" disabled={!isFormValid || isLoading} className={`w-full text-white font-bold py-3 rounded-md mt-6 ${(!isFormValid || isLoading) ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700 shadow-md'}`}>
-              {isLoading ? 'অর্ডার প্রসেস হচ্ছে...' : `অর্ডার কনফার্ম করুন (৳${cartTotal})`}
+            <button type="submit" disabled={!isFormValid || isLoading} className={`w-full text-white font-bold py-4 rounded-lg mt-6 text-lg ${(!isFormValid || isLoading) ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700 shadow-md'}`}>
+              {isLoading ? 'অর্ডার প্রসেস হচ্ছে...' : `অর্ডার কনফার্ম করুন (৳${currentGrandTotal})`}
             </button>
           </form>
         </div>
 
         <div className="lg:w-1/3 bg-gray-50 rounded-lg shadow-md p-6 h-fit sticky top-24 border">
-          <h2 className="text-xl font-bold border-b pb-4 mb-4 text-gray-800">আপনার অর্ডার</h2>
-          <div className="space-y-3 mb-4 max-h-64 overflow-y-auto">
+          <h2 className="text-xl font-bold border-b pb-4 mb-4 text-gray-800">অর্ডার সামারি</h2>
+          <div className="space-y-3 mb-4 max-h-64 overflow-y-auto text-sm text-gray-700 border-b pb-4">
             {cart.map(item => (
-              <div key={item.id} className="flex justify-between text-sm text-gray-700">
+              <div key={item.id} className="flex justify-between">
                 <span>{item.name} <span className="text-blue-600 font-bold">x{item.quantity}</span></span>
                 <span className="font-semibold">৳{item.price * item.quantity}</span>
               </div>
             ))}
           </div>
-          <div className="border-t pt-4 flex justify-between font-bold text-lg text-gray-800">
-            <span>সর্বমোট বিল:</span>
-            <span className="text-blue-600">৳{cartTotal}</span>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between text-gray-600">
+              <span>সাব-টোটাল:</span><span>৳{cartTotal}</span>
+            </div>
+            <div className="flex justify-between text-gray-600 pb-2 border-b">
+              <span>ডেলিভারি চার্জ:</span>
+              <span>{currentDeliveryFee === 0 ? 'ফ্রি' : `৳${currentDeliveryFee}`}</span>
+            </div>
+            <div className="flex justify-between font-bold text-xl pt-2 text-gray-800">
+              <span>সর্বমোট বিল:</span>
+              <span className="text-blue-600">৳{currentGrandTotal}</span>
+            </div>
           </div>
         </div>
 
