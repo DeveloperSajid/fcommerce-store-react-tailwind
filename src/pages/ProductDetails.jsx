@@ -9,6 +9,10 @@ const ProductDetails = () => {
   const { id } = useParams(); 
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
+  
+  // নতুন স্টেট: বর্তমানে কোন বড় ছবিটি দেখানো হচ্ছে
+  const [mainImage, setMainImage] = useState(''); 
+  
   const { addToCart } = useContext(CartContext);
   const navigate = useNavigate();
 
@@ -19,7 +23,9 @@ const ProductDetails = () => {
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-          setProduct({ id: docSnap.id, ...docSnap.data() });
+          const data = docSnap.data();
+          setProduct({ id: docSnap.id, ...data });
+          setMainImage(data.image); // ডিফল্টভাবে প্রথম ছবিটিকে মেইন ছবি হিসেবে সেট করা
         } else {
           console.log("No such document!");
         }
@@ -52,6 +58,9 @@ const ProductDetails = () => {
     );
   }
 
+  // ডেটাবেস থেকে পাওয়া ৩টি ছবিকে একটি লিস্টে রাখা (যেগুলো ফাঁকা নয়, সেগুলোই শুধু নেবে)
+  const allImages = [product.image, product.image2, product.image3].filter(Boolean);
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
       <button 
@@ -63,14 +72,34 @@ const ProductDetails = () => {
 
       <div className="bg-white rounded-xl shadow-lg overflow-hidden flex flex-col md:flex-row">
         
+        {/* ইমেইজ গ্যালারি সেকশন */}
         <div className="md:w-1/2 p-4">
+          {/* বড় মেইন ছবি */}
           <img 
-            src={product.image} 
+            src={mainImage} 
             alt={product.name} 
-            className="w-full h-[400px] md:h-[500px] object-cover rounded-lg border" 
+            className="w-full h-[400px] md:h-[500px] object-cover rounded-lg border mb-4 transition-all duration-300" 
           />
+          
+          {/* ছোট থাম্বনেইল ছবিগুলো (একের বেশি ছবি থাকলেই শুধু দেখাবে) */}
+          {allImages.length > 1 && (
+            <div className="flex gap-3 overflow-x-auto pb-2">
+              {allImages.map((img, index) => (
+                <img 
+                  key={index} 
+                  src={img} 
+                  alt={`Thumbnail ${index + 1}`} 
+                  onClick={() => setMainImage(img)} // ক্লিক করলেই মেইন ছবি চেঞ্জ হবে
+                  className={`h-20 w-20 object-cover rounded-md border-2 cursor-pointer transition-all ${
+                    mainImage === img ? 'border-blue-600 scale-105 shadow-md' : 'border-gray-300 hover:border-blue-400'
+                  }`}
+                />
+              ))}
+            </div>
+          )}
         </div>
 
+        {/* প্রোডাক্ট ডিটেইলস সেকশন */}
         <div className="md:w-1/2 p-8 flex flex-col justify-center">
           <h1 className="text-3xl font-bold text-gray-800 mb-4 leading-tight">{product.name}</h1>
           <p className="text-3xl font-bold text-blue-600 mb-6">৳{product.price}</p>
@@ -81,7 +110,6 @@ const ProductDetails = () => {
             </span>
           </div>
 
-          {/* এখানে ফায়ারবেস থেকে আসা ডায়নামিক বিবরণ দেখানো হচ্ছে */}
           <div className="mb-8">
             <h3 className="text-lg font-bold text-gray-800 mb-2">প্রোডাক্টের বিবরণ:</h3>
             <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">

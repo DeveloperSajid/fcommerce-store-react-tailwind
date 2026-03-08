@@ -8,8 +8,13 @@ const Admin = () => {
   const [activeTab, setActiveTab] = useState('orders'); 
   const categoriesList = ['Electronics', 'Gadgets', 'Fashion', 'Home Appliances', 'Others'];
 
-  // --- ১. প্রোডাক্ট অ্যাড করার স্টেট ---
-  const [product, setProduct] = useState({ name: '', price: '', stock: '', description: '', category: 'Electronics', image: '' });
+  // ==========================================
+  // ১. নতুন প্রোডাক্ট যোগ করার স্টেট ও ফাংশন
+  // ==========================================
+  const [product, setProduct] = useState({ 
+    name: '', price: '', stock: '', description: '', category: 'Electronics', 
+    image: '', image2: '', image3: '' // একাধিক ছবির জন্য স্টেট
+  });
   const [imageFile, setImageFile] = useState(null); 
   const [isAddingProduct, setIsAddingProduct] = useState(false);
 
@@ -24,14 +29,16 @@ const Admin = () => {
   const handleAddProduct = async (e) => {
     e.preventDefault();
     
+    // ভ্যালিডেশন: প্রধান ছবি থাকতেই হবে
     if (!product.image && !imageFile) {
-      return alert("অনুগ্রহ করে ছবির লিংক দিন অথবা একটি ছবি আপলোড করুন!");
+      return alert("অনুগ্রহ করে অন্তত প্রধান ছবি (Image 1) এর লিংক দিন অথবা আপলোড করুন!");
     }
     
     setIsAddingProduct(true);
     try {
       let imageUrl = product.image; 
 
+      // যদি ডিভাইস থেকে ছবি সিলেক্ট করা থাকে, সেটি আপলোড করে লিংক নেবে
       if (imageFile) {
         const imageRef = ref(storage, `products/${Date.now()}_${imageFile.name}`);
         await uploadBytes(imageRef, imageFile);
@@ -44,11 +51,13 @@ const Admin = () => {
         stock: Number(product.stock),
         description: product.description,
         category: product.category,
-        image: imageUrl 
+        image: imageUrl,          // প্রধান ছবি
+        image2: product.image2,   // ২য় ছবি
+        image3: product.image3    // ৩য় ছবি
       });
 
       alert("🎉 প্রোডাক্ট সফলভাবে ডেটাবেসে যোগ করা হয়েছে!");
-      setProduct({ name: '', price: '', stock: '', description: '', category: 'Electronics', image: '' });
+      setProduct({ name: '', price: '', stock: '', description: '', category: 'Electronics', image: '', image2: '', image3: '' });
       setImageFile(null); 
       document.getElementById('imageInput').value = ''; 
     } catch (error) {
@@ -59,7 +68,9 @@ const Admin = () => {
     }
   };
 
-  // --- ২. অর্ডার দেখার স্টেট ---
+  // ==========================================
+  // ২. কাস্টমার অর্ডার ম্যানেজমেন্ট
+  // ==========================================
   const [orders, setOrders] = useState([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
 
@@ -79,12 +90,14 @@ const Admin = () => {
 
   const updateOrderStatus = async (order, newStatus) => {
     if (newStatus === 'Cancelled') {
-      const isConfirm = window.confirm("আপনি কি নিশ্চিত যে এই অর্ডারটি ক্যানসেল করতে চান?");
+      const isConfirm = window.confirm("আপনি কি নিশ্চিত যে এই অর্ডারটি ক্যানসেল করতে চান? ক্যানসেল করলে স্টক ফেরত যাবে।");
       if (!isConfirm) return;
     }
     try {
       const orderRef = doc(db, "orders", order.id);
       await updateDoc(orderRef, { status: newStatus });
+      
+      // অর্ডার ক্যানসেল হলে স্টক আবার ডেটাবেসে ফেরত যাবে
       if (newStatus === 'Cancelled') {
         for (const item of order.orderItems) {
           const productRef = doc(db, "products", item.id);
@@ -99,7 +112,9 @@ const Admin = () => {
     }
   };
 
-  // --- ৩. প্রোডাক্ট ম্যানেজমেন্ট (এডিট) ---
+  // ==========================================
+  // ৩. প্রোডাক্ট ম্যানেজমেন্ট ও এডিট
+  // ==========================================
   const [allProducts, setAllProducts] = useState([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null); 
@@ -133,7 +148,7 @@ const Admin = () => {
     e.preventDefault();
     
     if (!editingProduct.image && !editImageFile) {
-      return alert("অনুগ্রহ করে ছবির লিংক দিন অথবা একটি ছবি আপলোড করুন!");
+      return alert("অনুগ্রহ করে প্রধান ছবির লিংক দিন অথবা একটি ছবি আপলোড করুন!");
     }
 
     setIsUpdating(true);
@@ -153,7 +168,9 @@ const Admin = () => {
         stock: Number(editingProduct.stock),
         description: editingProduct.description || '',
         category: editingProduct.category || 'Others',
-        image: imageUrl 
+        image: imageUrl,
+        image2: editingProduct.image2 || '',
+        image3: editingProduct.image3 || ''
       });
       alert("প্রোডাক্ট সফলভাবে আপডেট করা হয়েছে!");
       setEditingProduct(null); 
@@ -175,6 +192,8 @@ const Admin = () => {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
+      
+      {/* হেডার */}
       <div className="flex justify-between items-center mb-8 border-b pb-4">
         <h1 className="text-3xl font-bold text-gray-800">অ্যাডমিন ড্যাশবোর্ড</h1>
         <button onClick={() => signOut(auth)} className="bg-red-500 hover:bg-red-600 text-white px-5 py-2 rounded-md font-bold transition duration-300 shadow-md">
@@ -182,13 +201,16 @@ const Admin = () => {
         </button>
       </div>
 
+      {/* ট্যাব নেভিগেশন */}
       <div className="flex flex-wrap justify-center gap-3 mb-8">
         <button onClick={() => setActiveTab('orders')} className={`px-6 py-2 rounded-md font-bold transition duration-300 ${activeTab === 'orders' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-600 border hover:bg-gray-100'}`}>কাস্টমার অর্ডার</button>
         <button onClick={() => setActiveTab('addProduct')} className={`px-6 py-2 rounded-md font-bold transition duration-300 ${activeTab === 'addProduct' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-600 border hover:bg-gray-100'}`}>নতুন প্রোডাক্ট যোগ</button>
         <button onClick={() => { setActiveTab('manageProducts'); setEditingProduct(null); }} className={`px-6 py-2 rounded-md font-bold transition duration-300 ${activeTab === 'manageProducts' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-600 border hover:bg-gray-100'}`}>প্রোডাক্ট ম্যানেজমেন্ট (এডিট)</button>
       </div>
 
-      {/* --- কাস্টমার অর্ডার --- */}
+      {/* ========================================== */}
+      {/* ট্যাব ১: কাস্টমার অর্ডারসমূহ */}
+      {/* ========================================== */}
       {activeTab === 'orders' && (
         <div className="bg-white rounded-lg shadow-lg p-6">
           <h2 className="text-xl font-bold text-gray-800 border-b pb-4 mb-6">সর্বশেষ অর্ডারসমূহ</h2>
@@ -235,7 +257,9 @@ const Admin = () => {
         </div>
       )}
 
-      {/* --- নতুন প্রোডাক্ট আপলোড --- */}
+      {/* ========================================== */}
+      {/* ট্যাব ২: নতুন প্রোডাক্ট আপলোড */}
+      {/* ========================================== */}
       {activeTab === 'addProduct' && (
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-2xl mx-auto">
           <h2 className="text-xl font-bold text-gray-800 mb-6 text-center border-b pb-4">নতুন প্রোডাক্ট আপলোড করুন</h2>
@@ -264,43 +288,44 @@ const Admin = () => {
               </div>
             </div>
 
-            <div className="border border-gray-300 p-5 rounded-lg bg-blue-50 bg-opacity-30">
-              <h3 className="font-bold text-gray-700 mb-4 border-b pb-2">প্রোডাক্টের ছবি <span className="text-sm font-normal text-red-500">(যেকোনো একটি পদ্ধতি বেছে নিন) *</span></h3>
-              
-              <div className="mb-4">
-                <label className="block text-gray-700 text-sm font-bold mb-2">পদ্ধতি ১: ছবির লিংক (URL) দিন</label>
-                <input type="url" name="image" value={product.image} onChange={handleAddInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" placeholder="https://example.com/image.jpg" />
+            {/* ছবি আপলোড সেকশন (প্রধান এবং ঐচ্ছিক) */}
+            <div className="space-y-4">
+              {/* প্রধান ছবি */}
+              <div className="border border-blue-200 p-5 rounded-lg bg-blue-50 bg-opacity-30">
+                <h3 className="font-bold text-gray-700 mb-3 border-b pb-2">প্রধান ছবি (আবশ্যক) *</h3>
+                <div className="mb-3">
+                  <label className="block text-gray-600 text-sm font-bold mb-1">লিংক (URL) দিন:</label>
+                  <input type="url" name="image" value={product.image} onChange={handleAddInputChange} className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" placeholder="https://example.com/image.jpg" />
+                </div>
+                <div className="relative flex items-center py-1">
+                  <div className="flex-grow border-t border-gray-300"></div><span className="flex-shrink-0 mx-4 text-gray-400 font-bold text-xs">অথবা</span><div className="flex-grow border-t border-gray-300"></div>
+                </div>
+                <div className="mt-2">
+                  <label className="block text-gray-600 text-sm font-bold mb-1">ডিভাইস থেকে আপলোড করুন:</label>
+                  <input id="imageInput" type="file" accept="image/*" onChange={handleImageChange} className="w-full text-sm file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:bg-blue-100 file:text-blue-700 cursor-pointer" />
+                </div>
+                {/* প্রধান ছবির প্রিভিউ */}
+                <div className="mt-3">
+                  {imageFile ? (
+                    <img src={URL.createObjectURL(imageFile)} alt="Preview File" className="h-24 object-cover rounded border shadow-sm" />
+                  ) : product.image ? (
+                    <img src={product.image} alt="Preview URL" className="h-24 object-cover rounded border shadow-sm" />
+                  ) : null}
+                </div>
               </div>
 
-              <div className="relative flex items-center py-2">
-                <div className="flex-grow border-t border-gray-300"></div>
-                <span className="flex-shrink-0 mx-4 text-gray-400 font-bold text-sm">অথবা</span>
-                <div className="flex-grow border-t border-gray-300"></div>
+              {/* ২য় ছবি */}
+              <div className="border border-gray-200 p-4 rounded-lg bg-gray-50">
+                <h3 className="font-bold text-gray-600 mb-2 border-b pb-2">২য় ছবি (ঐচ্ছিক)</h3>
+                <input type="url" name="image2" value={product.image2} onChange={handleAddInputChange} className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" placeholder="২য় ছবির লিংক (URL) দিন" />
+                {product.image2 && <img src={product.image2} alt="Preview 2" className="h-16 mt-2 rounded border" />}
               </div>
 
-              <div className="mt-2">
-                <label className="block text-gray-700 text-sm font-bold mb-2">পদ্ধতি ২: ডিভাইস থেকে ছবি আপলোড করুন</label>
-                <input 
-                  id="imageInput"
-                  type="file" 
-                  accept="image/*" 
-                  onChange={handleImageChange} 
-                  className="w-full bg-white border p-2 rounded cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200" 
-                />
-              </div>
-
-              {/* নতুন: ছবির প্রিভিউ সেকশন */}
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <p className="text-sm font-bold text-gray-700 mb-2">ছবির প্রিভিউ:</p>
-                {imageFile ? (
-                  <img src={URL.createObjectURL(imageFile)} alt="Preview File" className="h-40 object-cover rounded border shadow-sm" />
-                ) : product.image ? (
-                  <img src={product.image} alt="Preview URL" className="h-40 object-cover rounded border shadow-sm" />
-                ) : (
-                  <div className="h-40 w-full bg-white border-2 border-dashed border-gray-300 rounded flex items-center justify-center text-gray-400 text-sm">
-                    কোনো ছবি সিলেক্ট করা হয়নি
-                  </div>
-                )}
+              {/* ৩য় ছবি */}
+              <div className="border border-gray-200 p-4 rounded-lg bg-gray-50">
+                <h3 className="font-bold text-gray-600 mb-2 border-b pb-2">৩য় ছবি (ঐচ্ছিক)</h3>
+                <input type="url" name="image3" value={product.image3} onChange={handleAddInputChange} className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" placeholder="৩য় ছবির লিংক (URL) দিন" />
+                {product.image3 && <img src={product.image3} alt="Preview 3" className="h-16 mt-2 rounded border" />}
               </div>
             </div>
             
@@ -316,10 +341,13 @@ const Admin = () => {
         </div>
       )}
 
-      {/* --- প্রোডাক্ট এডিট --- */}
+      {/* ========================================== */}
+      {/* ট্যাব ৩: প্রোডাক্ট ম্যানেজমেন্ট (এডিট) */}
+      {/* ========================================== */}
       {activeTab === 'manageProducts' && (
         <div className="bg-white rounded-lg shadow-lg p-6">
           <h2 className="text-xl font-bold text-gray-800 border-b pb-4 mb-6">{editingProduct ? 'প্রোডাক্ট এডিট করুন' : 'সকল প্রোডাক্ট'}</h2>
+          
           {editingProduct ? (
             <div className="max-w-2xl mx-auto">
               <button onClick={() => setEditingProduct(null)} className="mb-6 text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-2">← ফিরে যান</button>
@@ -347,33 +375,41 @@ const Admin = () => {
                   </div>
                 </div>
                 
-                <div className="border border-gray-300 p-5 rounded-lg bg-white">
-                  <h3 className="font-bold text-gray-700 mb-4 border-b pb-2">প্রোডাক্টের ছবি এডিট</h3>
-                  
-                  <div className="mb-4">
-                    <label className="block text-gray-700 text-sm font-bold mb-2">লিংক (URL) পরিবর্তন করুন</label>
-                    <input type="url" name="image" value={editingProduct.image} onChange={handleEditInputChange} className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                {/* এডিট ফর্মে ছবি আপডেটের অপশন */}
+                <div className="space-y-4">
+                  <div className="border border-blue-200 p-4 rounded-lg bg-white">
+                    <h3 className="font-bold text-gray-700 mb-3 border-b pb-2">প্রধান ছবি এডিট</h3>
+                    <div className="mb-3">
+                      <label className="block text-gray-600 text-sm font-bold mb-1">লিংক (URL) পরিবর্তন করুন:</label>
+                      <input type="url" name="image" value={editingProduct.image} onChange={handleEditInputChange} className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    </div>
+                    <div className="relative flex items-center py-1">
+                      <div className="flex-grow border-t border-gray-200"></div><span className="flex-shrink-0 mx-4 text-gray-400 font-bold text-xs">অথবা</span><div className="flex-grow border-t border-gray-200"></div>
+                    </div>
+                    <div className="mt-2">
+                      <label className="block text-gray-600 text-sm font-bold mb-1">নতুন ছবি আপলোড করুন:</label>
+                      <input type="file" accept="image/*" onChange={handleEditImageChange} className="w-full text-sm file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:bg-blue-50 file:text-blue-700 cursor-pointer" />
+                    </div>
+                    <div className="mt-3 pt-2 border-t">
+                      <p className="text-xs font-bold text-gray-500 mb-1">প্রিভিউ:</p>
+                      {editImageFile ? (
+                        <img src={URL.createObjectURL(editImageFile)} alt="New Preview" className="h-20 object-cover rounded border shadow-sm" />
+                      ) : editingProduct.image ? (
+                        <img src={editingProduct.image} alt="Current Preview" className="h-20 object-cover rounded border shadow-sm" />
+                      ) : null}
+                    </div>
                   </div>
 
-                  <div className="relative flex items-center py-2">
-                    <div className="flex-grow border-t border-gray-200"></div>
-                    <span className="flex-shrink-0 mx-4 text-gray-400 font-bold text-sm">অথবা</span>
-                    <div className="flex-grow border-t border-gray-200"></div>
+                  <div className="border border-gray-200 p-4 rounded-lg bg-white">
+                    <h3 className="font-bold text-gray-600 mb-2 border-b pb-2">২য় ছবি এডিট (ঐচ্ছিক)</h3>
+                    <input type="url" name="image2" value={editingProduct.image2 || ''} onChange={handleEditInputChange} className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="২য় ছবির লিংক (URL)" />
+                    {editingProduct.image2 && <img src={editingProduct.image2} alt="Preview 2" className="h-16 mt-2 rounded border" />}
                   </div>
 
-                  <div className="mt-2">
-                    <label className="block text-gray-700 text-sm font-bold mb-2">নতুন ছবি আপলোড করুন</label>
-                    <input type="file" accept="image/*" onChange={handleEditImageChange} className="w-full text-sm file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" />
-                  </div>
-
-                  {/* এডিট ফর্মে বর্তমান/নতুন ছবির প্রিভিউ */}
-                  <div className="mt-4 pt-3 border-t">
-                    <p className="text-sm font-bold text-gray-600 mb-2">বর্তমান/নতুন ছবির প্রিভিউ:</p>
-                    {editImageFile ? (
-                      <img src={URL.createObjectURL(editImageFile)} alt="New Preview" className="h-32 object-cover rounded border shadow-sm" />
-                    ) : editingProduct.image ? (
-                      <img src={editingProduct.image} alt="Current Preview" className="h-32 object-cover rounded border shadow-sm" />
-                    ) : null}
+                  <div className="border border-gray-200 p-4 rounded-lg bg-white">
+                    <h3 className="font-bold text-gray-600 mb-2 border-b pb-2">৩য় ছবি এডিট (ঐচ্ছিক)</h3>
+                    <input type="url" name="image3" value={editingProduct.image3 || ''} onChange={handleEditInputChange} className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="৩য় ছবির লিংক (URL)" />
+                    {editingProduct.image3 && <img src={editingProduct.image3} alt="Preview 3" className="h-16 mt-2 rounded border" />}
                   </div>
                 </div>
 
@@ -387,7 +423,8 @@ const Admin = () => {
               </form>
             </div>
           ) : (
-             isLoadingProducts ? (
+            /* সব প্রোডাক্টের লিস্ট দেখানোর অংশ */
+            isLoadingProducts ? (
               <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div></div>
             ) : allProducts.length === 0 ? (
               <div className="text-center text-gray-500 py-10">কোনো প্রোডাক্ট পাওয়া যায়নি।</div>
