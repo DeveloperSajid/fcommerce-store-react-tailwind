@@ -2,8 +2,9 @@ import { useContext, useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { CartContext } from '../context/CartContext';
 import { db } from '../firebase';
-// doc, updateDoc, increment ইম্পোর্ট করা হলো
 import { collection, addDoc, serverTimestamp, doc, updateDoc, increment } from 'firebase/firestore';
+// EmailJS ইম্পোর্ট করা হলো
+import emailjs from '@emailjs/browser';
 
 const Checkout = () => {
   const { cart, cartTotal, clearCart } = useContext(CartContext);
@@ -32,6 +33,7 @@ const Checkout = () => {
     if (val.length <= 30) setFormData({ ...formData, trxId: val });
   };
 
+  // মূল অর্ডার ফাংশন
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
     if (formData.phone.length !== 11) return alert("১১ ডিজিটের সঠিক মোবাইল নম্বর দিন।");
@@ -42,7 +44,7 @@ const Checkout = () => {
     
     setIsLoading(true);
     try {
-      // ১. 'orders' কালেকশনে অর্ডার সেভ করা
+      // ১. ডেটাবেসে অর্ডার সেভ করা
       await addDoc(collection(db, "orders"), {
         customerInfo: formData,
         orderItems: cart,
@@ -51,17 +53,42 @@ const Checkout = () => {
         orderDate: serverTimestamp()
       });
 
-      // ২. অর্ডার কনফার্ম হওয়ার সাথে সাথেই মেইন স্টক থেকে প্রোডাক্টের পরিমাণ কমানো
+      // ২. স্টক কমানো
       for (const item of cart) {
         const productRef = doc(db, "products", item.id);
         await updateDoc(productRef, {
-          stock: increment(-item.quantity) // ডেটাবেস থেকে বিয়োগ হচ্ছে
+          stock: increment(-item.quantity)
         });
       }
 
+      // ৩. EmailJS (আলাদা try-catch ব্লকে রাখা হলো যেন এটি ফেইল করলে অর্ডার না আটকায়)
+      try {
+        const templateParams = {
+          customer_name: formData.name,
+          customer_phone: formData.phone,
+          customer_address: formData.address,
+          payment_method: formData.paymentMethod,
+          total_amount: cartTotal,
+        };
+        
+        // ⚠️ নিচে আপনার আইডিগুলো বসান:
+        await emailjs.send(
+          'service_foi8w12',     // আপনার Service ID বসান
+          'template_sav7hna',    // আপনার Template ID বসান
+          templateParams, 
+          'A5tzlb51wbGgiSFRI'      // আপনার Public Key বসান
+        );
+        console.log("Email sent successfully!");
+      } catch (emailError) {
+        console.error("Email limit reached or error: ", emailError);
+        // ইমেইল ফেইল করলেও কাস্টমারকে কিছু বুঝতে দেওয়া হবে না
+      }
+
+      // ৪. কাস্টমারকে সফলতার মেসেজ দেখানো
       alert("ধন্যবাদ! আপনার অর্ডারটি সফলভাবে প্লেস হয়েছে।");
       clearCart();
       navigate('/');
+      
     } catch (error) {
       console.error(error);
       alert("দুঃখিত, অর্ডার প্লেস হয়নি। ইন্টারনেট কানেকশন চেক করুন।");
@@ -87,6 +114,7 @@ const Checkout = () => {
       <h1 className="text-3xl font-bold text-gray-800 mb-8">চেকআউট</h1>
       <div className="flex flex-col lg:flex-row gap-8">
         
+        {/* ফর্ম সেকশন */}
         <div className="lg:w-2/3 bg-white rounded-lg shadow-md p-6">
           <form onSubmit={handlePlaceOrder} className="space-y-4">
             <div>
@@ -132,6 +160,7 @@ const Checkout = () => {
           </form>
         </div>
 
+        {/* অর্ডার সামারি */}
         <div className="lg:w-1/3 bg-gray-50 rounded-lg shadow-md p-6 h-fit sticky top-24 border">
           <h2 className="text-xl font-bold border-b pb-4 mb-4">আপনার অর্ডার</h2>
           <div className="space-y-3 mb-4 max-h-64 overflow-y-auto">
