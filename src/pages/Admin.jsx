@@ -13,7 +13,7 @@ const Admin = () => {
   // ==========================================
   const [product, setProduct] = useState({ 
     name: '', price: '', stock: '', description: '', category: 'Electronics', 
-    image: '', image2: '', image3: '' // একাধিক ছবির জন্য স্টেট
+    image: '', image2: '', image3: '' 
   });
   const [imageFile, setImageFile] = useState(null); 
   const [isAddingProduct, setIsAddingProduct] = useState(false);
@@ -51,9 +51,9 @@ const Admin = () => {
         stock: Number(product.stock),
         description: product.description,
         category: product.category,
-        image: imageUrl,          // প্রধান ছবি
-        image2: product.image2,   // ২য় ছবি
-        image3: product.image3    // ৩য় ছবি
+        image: imageUrl,          
+        image2: product.image2,   
+        image3: product.image3    
       });
 
       alert("🎉 প্রোডাক্ট সফলভাবে ডেটাবেসে যোগ করা হয়েছে!");
@@ -69,7 +69,7 @@ const Admin = () => {
   };
 
   // ==========================================
-  // ২. কাস্টমার অর্ডার ম্যানেজমেন্ট
+  // ২. কাস্টমার অর্ডার ম্যানেজমেন্ট (৬টি স্ট্যাটাসসহ)
   // ==========================================
   const [orders, setOrders] = useState([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
@@ -88,22 +88,39 @@ const Admin = () => {
     }
   };
 
+  // স্ট্যাটাস অনুযায়ী ব্যাজের রং ঠিক করার হেল্পার
+  const getAdminStatusColor = (status) => {
+    switch(status) {
+      case 'Pending': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+      case 'Hold': return 'bg-orange-100 text-orange-700 border-orange-200';
+      case 'Processing': return 'bg-blue-100 text-blue-700 border-blue-200';
+      case 'Shipped': return 'bg-purple-100 text-purple-700 border-purple-200';
+      case 'Delivered': return 'bg-green-100 text-green-700 border-green-200';
+      case 'Cancelled': return 'bg-red-100 text-red-700 border-red-200';
+      default: return 'bg-yellow-100 text-yellow-700 border-yellow-200';
+    }
+  };
+
   const updateOrderStatus = async (order, newStatus) => {
+    if (order.status === newStatus) return;
+
     if (newStatus === 'Cancelled') {
-      const isConfirm = window.confirm("আপনি কি নিশ্চিত যে এই অর্ডারটি ক্যানসেল করতে চান? ক্যানসেল করলে স্টক ফেরত যাবে।");
+      const isConfirm = window.confirm("আপনি কি নিশ্চিত যে এই অর্ডারটি ক্যানসেল করতে চান? ক্যানসেল করলে প্রোডাক্টের স্টক আবার ডেটাবেসে ফেরত যাবে।");
       if (!isConfirm) return;
     }
+
     try {
       const orderRef = doc(db, "orders", order.id);
       await updateDoc(orderRef, { status: newStatus });
-      
-      // অর্ডার ক্যানসেল হলে স্টক আবার ডেটাবেসে ফেরত যাবে
-      if (newStatus === 'Cancelled') {
+
+      // যদি অর্ডার ক্যানসেল করা হয় (এবং আগে ক্যানসেল না থেকে থাকে), তবে স্টক ফেরত যাবে
+      if (newStatus === 'Cancelled' && order.status !== 'Cancelled') {
         for (const item of order.orderItems) {
           const productRef = doc(db, "products", item.id);
           await updateDoc(productRef, { stock: increment(item.quantity) });
         }
       }
+
       alert(`অর্ডারের স্ট্যাটাস '${newStatus}'-এ আপডেট করা হয়েছে!`);
       fetchOrders(); 
     } catch (error) {
@@ -228,11 +245,23 @@ const Admin = () => {
                       <p className="font-bold text-gray-800">{order.customerInfo?.name}</p>
                       <p className="text-sm text-gray-600">{order.customerInfo?.phone}</p>
                     </div>
-                    <span className={`px-3 py-1 text-xs font-bold rounded-full ${order.status === 'Delivered' ? 'bg-green-100 text-green-700' : order.status === 'Cancelled' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'}`}>{order.status || 'Pending'}</span>
+                    {/* ডায়নামিক কালার ব্যাজ */}
+                    <span className={`px-3 py-1 text-xs font-bold rounded-full ${getAdminStatusColor(order.status || 'Pending')}`}>
+                      {order.status || 'Pending'}
+                    </span>
                   </div>
+                  
                   <div className="text-sm text-gray-700 mb-4">
                     <p><span className="font-semibold">ঠিকানা:</span> {order.customerInfo?.address}</p>
+                    {order.customerInfo?.paymentMethod === 'bkash' && (
+                      <div className="bg-pink-50 p-2 mt-2 rounded text-xs border border-pink-100">
+                        <p className="font-bold text-pink-600 mb-1">bKash Payment</p>
+                        <p>নম্বর: {order.customerInfo?.bkashNumber}</p>
+                        <p>TrxID: <span className="font-mono">{order.customerInfo?.trxId}</span></p>
+                      </div>
+                    )}
                   </div>
+                  
                   <div className="bg-gray-50 p-3 rounded mb-4">
                     <p className="font-bold text-sm mb-2 border-b pb-1">অর্ডার করা প্রোডাক্ট:</p>
                     {order.orderItems?.map(item => (
@@ -244,12 +273,24 @@ const Admin = () => {
                       <span>মোট বিল:</span><span className="text-blue-600">৳{order.totalAmount}</span>
                     </div>
                   </div>
-                  {order.status !== 'Delivered' && order.status !== 'Cancelled' && (
-                    <div className="flex gap-2 mt-4">
-                      <button onClick={() => updateOrderStatus(order, 'Delivered')} className="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm font-bold py-2 rounded transition">Delivered</button>
-                      <button onClick={() => updateOrderStatus(order, 'Cancelled')} className="flex-1 bg-red-500 hover:bg-red-600 text-white text-sm font-bold py-2 rounded transition">Cancel</button>
-                    </div>
-                  )}
+                  
+                  {/* নতুন ড্রপডাউন (Select) মেনু স্ট্যাটাস আপডেটের জন্য */}
+                  <div className="flex items-center gap-3 mt-4 border-t pt-4 bg-gray-50 p-3 rounded-md">
+                    <span className="font-bold text-gray-700 text-sm">স্ট্যাটাস পরিবর্তন:</span>
+                    <select
+                      value={order.status || 'Pending'}
+                      onChange={(e) => updateOrderStatus(order, e.target.value)}
+                      className={`border-2 p-2 rounded focus:outline-none font-semibold text-sm flex-grow cursor-pointer ${getAdminStatusColor(order.status || 'Pending')}`}
+                    >
+                      <option value="Pending" className="text-yellow-700 bg-white">Pending (পেন্ডিং)</option>
+                      <option value="Hold" className="text-orange-700 bg-white">Hold (হোল্ড)</option>
+                      <option value="Processing" className="text-blue-700 bg-white">Processing (প্রসেসিং)</option>
+                      <option value="Shipped" className="text-purple-700 bg-white">Shipped (শিপিং)</option>
+                      <option value="Delivered" className="text-green-700 bg-white">Delivered (ডেলিভারি সম্পন্ন)</option>
+                      <option value="Cancelled" className="text-red-700 bg-white">Cancelled (বাতিল)</option>
+                    </select>
+                  </div>
+
                 </div>
               ))}
              </div>
@@ -288,7 +329,6 @@ const Admin = () => {
               </div>
             </div>
 
-            {/* ছবি আপলোড সেকশন (প্রধান এবং ঐচ্ছিক) */}
             <div className="space-y-4">
               {/* প্রধান ছবি */}
               <div className="border border-blue-200 p-5 rounded-lg bg-blue-50 bg-opacity-30">
