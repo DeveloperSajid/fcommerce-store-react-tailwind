@@ -3,12 +3,18 @@ import { db, auth, storage } from '../firebase';
 import { collection, addDoc, getDocs, doc, updateDoc, increment, setDoc, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { signOut } from 'firebase/auth'; 
+import toast from 'react-hot-toast';
+
+// PDF এর জন্য প্রয়োজনীয় ইম্পোর্ট
+import { jsPDF } from "jspdf";
+import "jspdf-autotable";
+import { FaDownload } from 'react-icons/fa';
 
 const Admin = () => {
   const [activeTab, setActiveTab] = useState('orders'); 
   const categoriesList = ['Electronics', 'Gadgets', 'Fashion', 'Home Appliances', 'Others'];
 
-  // --- ১. প্রোডাক্ট যোগ করার স্টেট (৩টি ছবির স্টেট যুক্ত করা হলো) ---
+  // --- ১. প্রোডাক্ট যোগ করার স্টেট (৩টি ছবির অপশনসহ) ---
   const [product, setProduct] = useState({ name: '', price: '', stock: '', description: '', category: 'Electronics', image: '', image2: '', image3: '' });
   const [imageFile, setImageFile] = useState(null); 
   const [isAddingProduct, setIsAddingProduct] = useState(false);
@@ -18,7 +24,7 @@ const Admin = () => {
 
   const handleAddProduct = async (e) => {
     e.preventDefault();
-    if (!product.image && !imageFile) return alert("প্রধান ছবির লিংক দিন অথবা আপলোড করুন!");
+    if (!product.image && !imageFile) return toast.error("প্রধান ছবির লিংক দিন অথবা আপলোড করুন!");
     setIsAddingProduct(true);
     try {
       let imageUrl = product.image; 
@@ -28,7 +34,6 @@ const Admin = () => {
         imageUrl = await getDownloadURL(imageRef);
       }
       
-      // ৩টি ছবিই ডেটাবেসে যাবে
       await addDoc(collection(db, "products"), {
         name: product.name, 
         price: Number(product.price), 
@@ -36,16 +41,16 @@ const Admin = () => {
         description: product.description,
         category: product.category, 
         image: imageUrl,
-        image2: product.image2,
-        image3: product.image3
+        image2: product.image2 || '',
+        image3: product.image3 || ''
       });
 
-      alert("🎉 প্রোডাক্ট সফলভাবে যোগ করা হয়েছে!");
+      toast.success("🎉 প্রোডাক্ট সফলভাবে যোগ করা হয়েছে!");
       setProduct({ name: '', price: '', stock: '', description: '', category: 'Electronics', image: '', image2: '', image3: '' });
       setImageFile(null); 
       document.getElementById('imageInput').value = ''; 
     } catch (error) {
-      console.error(error); alert("প্রোডাক্ট যোগ করতে সমস্যা হয়েছে।");
+      console.error(error); toast.error("প্রোডাক্ট যোগ করতে সমস্যা হয়েছে।");
     } finally { setIsAddingProduct(false); }
   };
 
@@ -85,12 +90,78 @@ const Admin = () => {
           await updateDoc(doc(db, "products", item.id), { stock: increment(item.quantity) });
         }
       }
-      alert(`স্ট্যাটাস '${newStatus}'-এ আপডেট হয়েছে!`);
+      toast.success(`স্ট্যাটাস '${newStatus}'-এ আপডেট হয়েছে!`);
       fetchOrders(); 
-    } catch (error) { console.error(error); alert("স্ট্যাটাস আপডেট করতে সমস্যা হয়েছে।"); }
+    } catch (error) { console.error(error); toast.error("স্ট্যাটাস আপডেট করতে সমস্যা হয়েছে।"); }
   };
 
-  // --- ৩. প্রোডাক্ট ম্যানেজমেন্ট ---
+  // --- ৩. ইনভয়েস জেনারেটর ফাংশন (PDF) ---
+  const downloadInvoice = (order) => {
+    const doc = new jsPDF();
+    
+    // হেডার
+    doc.setFontSize(20);
+    doc.setTextColor(40);
+    doc.text(storeSettings.storePickupName, 105, 15, { align: "center" });
+    
+    doc.setFontSize(10);
+    doc.text(storeSettings.storePickupAddress, 105, 22, { align: "center" });
+    doc.line(20, 25, 190, 25);
+
+    // অর্ডার ইনফো
+    doc.setFontSize(12);
+    doc.text(`Invoice ID: ${order.id.slice(-6).toUpperCase()}`, 20, 35);
+    doc.text(`Date: ${order.orderDate?.toDate().toLocaleDateString('bn-BD')}`, 20, 42);
+    doc.text(`Status: ${order.status}`, 20, 49);
+
+    // বিলিং ডিটেইলস
+    doc.text("Bill To:", 20, 60);
+    doc.setFont(undefined, 'bold');
+    doc.text(order.customerInfo.name, 20, 67);
+    doc.setFont(undefined, 'normal');
+    doc.text(`Phone: ${order.customerInfo.phone}`, 20, 74);
+    doc.text(`Address: ${order.customerInfo.address}`, 20, 81, { maxWidth: 80 });
+
+    // টেবিল তৈরি
+    const tableColumn = ["Product Name", "Price", "Qty", "Total"];
+    const tableRows = [];
+
+    order.orderItems.forEach(item => {
+      const rowData = [
+        item.name,
+        `${item.price} TK`,
+        item.quantity,
+        `${item.price * item.quantity} TK`
+      ];
+      tableRows.push(rowData);
+    });
+
+    doc.autoTable({
+      startY: 90,
+      head: [tableColumn],
+      body: tableRows,
+      theme: 'grid',
+      headStyles: { fillGray: [41, 128, 185], textColor: 255 }
+    });
+
+    // বিল সামারি
+    const finalY = doc.lastAutoTable.finalY + 10;
+    doc.text(`Sub-Total: ${order.totalAmount} TK`, 140, finalY);
+    doc.text(`Delivery Fee: ${order.deliveryFee || 0} TK`, 140, finalY + 7);
+    doc.setFontSize(14);
+    doc.setFont(undefined, 'bold');
+    doc.text(`Grand Total: ${order.grandTotal || order.totalAmount} TK`, 140, finalY + 15);
+
+    // ফুটার
+    doc.setFontSize(10);
+    doc.setFont(undefined, 'normal');
+    doc.text("Thank you for shopping with us!", 105, 280, { align: "center" });
+
+    doc.save(`Invoice_${order.id.slice(-6)}.pdf`);
+    toast.success("ইনভয়েস ডাউনলোড হচ্ছে...");
+  };
+
+  // --- ৪. প্রোডাক্ট ম্যানেজমেন্ট (এডিট) ---
   const [allProducts, setAllProducts] = useState([]);
   const [editingProduct, setEditingProduct] = useState(null); 
   const [editImageFile, setEditImageFile] = useState(null); 
@@ -105,7 +176,7 @@ const Admin = () => {
 
   const handleUpdateProduct = async (e) => {
     e.preventDefault();
-    if (!editingProduct.image && !editImageFile) return alert("প্রধান ছবির লিংক দিন অথবা ছবি আপলোড করুন!");
+    if (!editingProduct.image && !editImageFile) return toast.error("প্রধান ছবির লিংক দিন!");
     setIsUpdating(true);
     try {
       let imageUrl = editingProduct.image; 
@@ -115,7 +186,6 @@ const Admin = () => {
         imageUrl = await getDownloadURL(imageRef);
       }
       
-      // ৩টি ছবিই ডেটাবেসে আপডেট হবে
       await updateDoc(doc(db, "products", editingProduct.id), {
         name: editingProduct.name, 
         price: Number(editingProduct.price), 
@@ -127,12 +197,12 @@ const Admin = () => {
         image3: editingProduct.image3 || ''
       });
 
-      alert("প্রোডাক্ট আপডেট হয়েছে!");
+      toast.success("প্রোডাক্ট আপডেট হয়েছে!");
       setEditingProduct(null); setEditImageFile(null); fetchAllProducts(); 
-    } catch (error) { console.error(error); alert("আপডেট করতে সমস্যা হয়েছে।"); } finally { setIsUpdating(false); }
+    } catch (error) { console.error(error); toast.error("আপডেট করতে সমস্যা হয়েছে।"); } finally { setIsUpdating(false); }
   };
 
-  // --- ৪. সেটিংস (ডেলিভারি চার্জ এবং স্টোর পিকআপ) ---
+  // --- ৫. সেটিংস (ডেলিভারি ও স্টোর পিকআপ) ---
   const [storeSettings, setStoreSettings] = useState({ 
     bogura: 60, 
     dhaka: 120, 
@@ -146,11 +216,7 @@ const Admin = () => {
     try {
       const docSnap = await getDoc(doc(db, "settings", "delivery"));
       if (docSnap.exists()) {
-        const data = docSnap.data();
-        setStoreSettings({
-          ...storeSettings,
-          ...data
-        });
+        setStoreSettings({ ...storeSettings, ...docSnap.data() });
       }
     } catch (error) { console.error("Error fetching settings:", error); }
   };
@@ -166,9 +232,9 @@ const Admin = () => {
         storePickupName: storeSettings.storePickupName,
         storePickupAddress: storeSettings.storePickupAddress
       }, { merge: true });
-      alert("✅ সেটিংস সফলভাবে আপডেট হয়েছে!");
+      toast.success("✅ সেটিংস সফলভাবে আপডেট হয়েছে!");
     } catch (error) {
-      console.error("Error updating settings:", error); alert("সমস্যা হয়েছে!");
+      console.error("Error updating settings:", error); toast.error("সমস্যা হয়েছে!");
     } finally { setIsUpdatingSettings(false); }
   };
 
@@ -196,89 +262,98 @@ const Admin = () => {
       {activeTab === 'orders' && (
         <div className="bg-white rounded-lg shadow-lg p-6">
           <h2 className="text-xl font-bold border-b pb-4 mb-6">সর্বশেষ অর্ডারসমূহ</h2>
-          {orders.map(order => (
-            <div key={order.id} className="border rounded-lg p-5 mb-4 shadow-sm hover:shadow-md transition">
-              <div className="flex justify-between items-start mb-4 border-b pb-3">
-                <div>
-                  <span className="text-xs text-gray-500">ID: {order.id.slice(-6).toUpperCase()}</span>
-                  <p className="font-bold text-gray-800">{order.customerInfo?.name}</p>
-                  <p className="text-sm">{order.customerInfo?.phone}</p>
-                </div>
-                <span className={`px-3 py-1 text-xs font-bold rounded-full ${getAdminStatusColor(order.status || 'Pending')}`}>{order.status || 'Pending'}</span>
-              </div>
-              <div className="text-sm mb-4">
-                <p><span className="font-semibold">ঠিকানা:</span> {order.customerInfo?.address}</p>
-                {order.customerInfo?.paymentMethod === 'bkash' && (
-                  <div className="bg-pink-50 p-2 mt-2 rounded text-xs border border-pink-100">
-                    <p className="font-bold text-pink-600">bKash Payment</p>
-                    <p>নম্বর: {order.customerInfo?.bkashNumber} | TrxID: {order.customerInfo?.trxId}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {orders.map(order => (
+              <div key={order.id} className="border rounded-lg p-5 mb-4 shadow-sm hover:shadow-md transition bg-white">
+                <div className="flex justify-between items-start mb-4 border-b pb-3">
+                  <div>
+                    <span className="text-xs text-gray-500 uppercase">ID: {order.id.slice(-6)}</span>
+                    <p className="font-bold text-gray-800">{order.customerInfo?.name}</p>
+                    <p className="text-sm">{order.customerInfo?.phone}</p>
                   </div>
-                )}
-              </div>
-              <div className="bg-gray-50 p-3 rounded mb-4 text-sm">
-                <p className="font-bold mb-2 border-b pb-1">প্রোডাক্ট:</p>
-                {order.orderItems?.map(item => (
-                  <div key={item.id} className="flex justify-between mb-1 text-gray-600">
-                    <span>{item.name} (x{item.quantity})</span><span>৳{item.price * item.quantity}</span>
+                  <span className={`px-3 py-1 text-xs font-bold rounded-full ${getAdminStatusColor(order.status || 'Pending')}`}>{order.status || 'Pending'}</span>
+                </div>
+                <div className="text-sm mb-4 h-20 overflow-y-auto">
+                  <p><span className="font-semibold">ঠিকানা:</span> {order.customerInfo?.address}</p>
+                  {order.customerInfo?.paymentMethod === 'bkash' && (
+                    <div className="bg-pink-50 p-2 mt-2 rounded text-xs border border-pink-100 text-pink-600 font-bold">
+                      bKash | {order.customerInfo?.bkashNumber} | ID: {order.customerInfo?.trxId}
+                    </div>
+                  )}
+                </div>
+                <div className="bg-gray-50 p-3 rounded mb-4 text-xs">
+                  {order.orderItems?.map(item => (
+                    <div key={item.id} className="flex justify-between mb-1 text-gray-600">
+                      <span>{item.name} (x{item.quantity})</span><span>৳{item.price * item.quantity}</span>
+                    </div>
+                  ))}
+                  <div className="border-t mt-2 pt-2 text-gray-600 flex justify-between">
+                    <span>ডেলিভারি চার্জ:</span> <span>৳{order.deliveryFee || 0}</span>
                   </div>
-                ))}
-                <div className="border-t mt-2 pt-2 text-gray-600 flex justify-between">
-                  <span>ডেলিভারি চার্জ:</span> <span>৳{order.deliveryFee || 0}</span>
+                  <div className="flex justify-between font-bold text-sm mt-1 text-blue-600">
+                    <span>সর্বমোট বিল:</span><span>৳{order.grandTotal || order.totalAmount}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between font-bold text-lg mt-1 text-blue-600">
-                  <span>সর্বমোট বিল:</span><span>৳{order.grandTotal || order.totalAmount}</span>
+                
+                {/* স্ট্যাটাস ড্রপডাউন এবং ইনভয়েস বাটন */}
+                <div className="flex flex-col gap-2 mt-4 border-t pt-4">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-xs">স্ট্যাটাস:</span>
+                    <select value={order.status || 'Pending'} onChange={(e) => updateOrderStatus(order, e.target.value)} className={`border p-2 rounded flex-grow font-semibold text-xs ${getAdminStatusColor(order.status || 'Pending')}`}>
+                      <option value="Pending">Pending</option>
+                      <option value="Hold">Hold</option>
+                      <option value="Processing">Processing</option>
+                      <option value="Shipped">Shipped</option>
+                      <option value="Delivered">Delivered</option>
+                      <option value="Cancelled">Cancelled</option>
+                    </select>
+                  </div>
+                  
+                  <button 
+                    onClick={() => downloadInvoice(order)}
+                    className="w-full bg-gray-800 text-white py-2 rounded-md font-bold flex justify-center items-center gap-2 hover:bg-black transition text-sm shadow-sm"
+                  >
+                    <FaDownload size={14} /> Download Invoice (PDF)
+                  </button>
                 </div>
               </div>
-              
-              <div className="flex items-center gap-3 mt-4 border-t pt-4 bg-gray-50 p-3 rounded-md">
-                <span className="font-bold text-sm">স্ট্যাটাস:</span>
-                <select value={order.status || 'Pending'} onChange={(e) => updateOrderStatus(order, e.target.value)} className={`border p-2 rounded flex-grow font-semibold text-sm ${getAdminStatusColor(order.status || 'Pending')}`}>
-                  <option value="Pending" className="text-yellow-700 bg-white">Pending</option>
-                  <option value="Hold" className="text-orange-700 bg-white">Hold</option>
-                  <option value="Processing" className="text-blue-700 bg-white">Processing</option>
-                  <option value="Shipped" className="text-purple-700 bg-white">Shipped</option>
-                  <option value="Delivered" className="text-green-700 bg-white">Delivered</option>
-                  <option value="Cancelled" className="text-red-700 bg-white">Cancelled</option>
-                </select>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 
       {activeTab === 'settings' && (
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-2xl mx-auto border-t-4 border-blue-600">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center border-b pb-4">ওয়েবসাইট সেটিংস</h2>
+          <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center border-b pb-4">ওয়েবসাইট সেটিংস</h2>
           <form onSubmit={handleUpdateSettings} className="space-y-6">
-            
             <div className="bg-gray-50 p-5 rounded-lg border">
               <h3 className="font-bold text-lg mb-4 text-gray-800 border-b pb-2">🚚 ডেলিভারি চার্জ সেটিংস</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-gray-700 font-bold mb-2">বগুড়া সদর (৳)</label>
+                  <label className="block text-gray-700 font-bold mb-2">বগুড়া (৳)</label>
                   <input type="number" value={storeSettings.bogura} required onChange={(e) => setStoreSettings({...storeSettings, bogura: e.target.value})} className="w-full border p-3 rounded font-bold text-blue-600" />
                 </div>
                 <div>
-                  <label className="block text-gray-700 font-bold mb-2">ঢাকা সিটি (৳)</label>
+                  <label className="block text-gray-700 font-bold mb-2">ঢাকা (৳)</label>
                   <input type="number" value={storeSettings.dhaka} required onChange={(e) => setStoreSettings({...storeSettings, dhaka: e.target.value})} className="w-full border p-3 rounded font-bold text-blue-600" />
                 </div>
                 <div>
-                  <label className="block text-gray-700 font-bold mb-2">অন্যান্য জেলা (৳)</label>
+                  <label className="block text-gray-700 font-bold mb-2">অন্যান্য (৳)</label>
                   <input type="number" value={storeSettings.others} required onChange={(e) => setStoreSettings({...storeSettings, others: e.target.value})} className="w-full border p-3 rounded font-bold text-blue-600" />
                 </div>
               </div>
             </div>
 
             <div className="bg-indigo-50 p-5 rounded-lg border border-indigo-100">
-              <h3 className="font-bold text-lg mb-4 text-indigo-900 border-b pb-2 border-indigo-200">🏬 স্টোর পিকআপ সেটিংস</h3>
+              <h3 className="font-bold text-lg mb-4 text-indigo-900 border-b pb-2">🏬 স্টোর পিকআপ সেটিংস</h3>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-indigo-800 font-bold mb-2">দোকানের নাম / পিকআপ পয়েন্ট</label>
-                  <input type="text" value={storeSettings.storePickupName} required onChange={(e) => setStoreSettings({...storeSettings, storePickupName: e.target.value})} className="w-full border p-3 rounded font-semibold text-gray-800 focus:ring-2 focus:ring-indigo-400 focus:outline-none" placeholder="যেমন: Sajid Tech & Finance" />
+                  <label className="block text-indigo-800 font-bold mb-2">দোকানের নাম</label>
+                  <input type="text" value={storeSettings.storePickupName} required onChange={(e) => setStoreSettings({...storeSettings, storePickupName: e.target.value})} className="w-full border p-3 rounded font-semibold text-gray-800" />
                 </div>
                 <div>
-                  <label className="block text-indigo-800 font-bold mb-2">পূর্ণাঙ্গ ঠিকানা</label>
-                  <input type="text" value={storeSettings.storePickupAddress} required onChange={(e) => setStoreSettings({...storeSettings, storePickupAddress: e.target.value})} className="w-full border p-3 rounded font-semibold text-gray-800 focus:ring-2 focus:ring-indigo-400 focus:outline-none" placeholder="যেমন: বগুড়া সদর, বগুড়া।" />
+                  <label className="block text-indigo-800 font-bold mb-2">ঠিকানা</label>
+                  <input type="text" value={storeSettings.storePickupAddress} required onChange={(e) => setStoreSettings({...storeSettings, storePickupAddress: e.target.value})} className="w-full border p-3 rounded font-semibold text-gray-800" />
                 </div>
               </div>
             </div>
@@ -290,7 +365,6 @@ const Admin = () => {
         </div>
       )}
 
-      {/* নতুন প্রোডাক্ট আপলোড (৩টি ছবির অপশনসহ) */}
       {activeTab === 'addProduct' && (
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-2xl mx-auto">
           <h2 className="text-xl font-bold border-b pb-4 mb-6 text-center">নতুন প্রোডাক্ট আপলোড</h2>
@@ -306,19 +380,17 @@ const Admin = () => {
               <div className="border border-blue-200 p-5 rounded-lg bg-blue-50 bg-opacity-30">
                 <h3 className="font-bold mb-3 border-b pb-2">প্রধান ছবি (আবশ্যক) *</h3>
                 <input type="url" name="image" value={product.image} onChange={handleAddInputChange} className="w-full border p-2 rounded mb-2 bg-white" placeholder="URL দিন" />
-                <input type="file" accept="image/*" onChange={handleImageChange} className="w-full text-sm" />
+                <input type="file" id="imageInput" accept="image/*" onChange={handleImageChange} className="w-full text-sm" />
               </div>
               
               <div className="border border-gray-200 p-4 rounded-lg bg-gray-50">
-                <h3 className="font-bold text-gray-600 mb-2 border-b pb-2">২য় ছবি (ঐচ্ছিক)</h3>
-                <input type="url" name="image2" value={product.image2} onChange={handleAddInputChange} className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" placeholder="২য় ছবির লিংক (URL) দিন" />
-                {product.image2 && <img src={product.image2} alt="Preview 2" className="h-16 mt-2 rounded border" />}
+                <h3 className="font-bold text-gray-600 mb-2 border-b pb-2">২য় ছবি (ঐচ্ছিক)</h3>
+                <input type="url" name="image2" value={product.image2} onChange={handleAddInputChange} className="w-full border p-2 rounded focus:outline-none bg-white" placeholder="২য় ছবির লিংক (URL) দিন" />
               </div>
 
               <div className="border border-gray-200 p-4 rounded-lg bg-gray-50">
-                <h3 className="font-bold text-gray-600 mb-2 border-b pb-2">৩য় ছবি (ঐচ্ছিক)</h3>
-                <input type="url" name="image3" value={product.image3} onChange={handleAddInputChange} className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" placeholder="৩য় ছবির লিংক (URL) দিন" />
-                {product.image3 && <img src={product.image3} alt="Preview 3" className="h-16 mt-2 rounded border" />}
+                <h3 className="font-bold text-gray-600 mb-2 border-b pb-2">৩য় ছবি (ঐচ্ছিক)</h3>
+                <input type="url" name="image3" value={product.image3} onChange={handleAddInputChange} className="w-full border p-2 rounded focus:outline-none bg-white" placeholder="৩য় ছবির লিংক (URL) দিন" />
               </div>
             </div>
 
@@ -328,7 +400,6 @@ const Admin = () => {
         </div>
       )}
 
-      {/* প্রোডাক্ট ম্যানেজমেন্ট (৩টি ছবির অপশনসহ) */}
       {activeTab === 'manageProducts' && (
         <div className="bg-white rounded-lg shadow-lg p-6">
           <h2 className="text-xl font-bold border-b pb-4 mb-6">{editingProduct ? 'এডিট করুন' : 'সকল প্রোডাক্ট'}</h2>
@@ -348,18 +419,8 @@ const Admin = () => {
                     <input type="url" value={editingProduct.image} onChange={(e)=>setEditingProduct({...editingProduct, image: e.target.value})} className="w-full border p-2 rounded mb-2" />
                     <input type="file" accept="image/*" onChange={(e) => setEditImageFile(e.target.files[0])} className="w-full text-sm" />
                   </div>
-                  
-                  <div className="border border-gray-200 p-4 rounded-lg bg-white">
-                    <h3 className="font-bold text-gray-600 mb-2 border-b pb-2">২য় ছবি এডিট (ঐচ্ছিক)</h3>
-                    <input type="url" name="image2" value={editingProduct.image2 || ''} onChange={(e)=>setEditingProduct({...editingProduct, image2: e.target.value})} className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="২য় ছবির লিংক (URL)" />
-                    {editingProduct.image2 && <img src={editingProduct.image2} alt="Preview 2" className="h-16 mt-2 rounded border" />}
-                  </div>
-
-                  <div className="border border-gray-200 p-4 rounded-lg bg-white">
-                    <h3 className="font-bold text-gray-600 mb-2 border-b pb-2">৩য় ছবি এডিট (ঐচ্ছিক)</h3>
-                    <input type="url" name="image3" value={editingProduct.image3 || ''} onChange={(e)=>setEditingProduct({...editingProduct, image3: e.target.value})} className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="৩য় ছবির লিংক (URL)" />
-                    {editingProduct.image3 && <img src={editingProduct.image3} alt="Preview 3" className="h-16 mt-2 rounded border" />}
-                  </div>
+                  <input type="url" name="image2" value={editingProduct.image2 || ''} onChange={(e)=>setEditingProduct({...editingProduct, image2: e.target.value})} className="w-full border p-2 rounded" placeholder="২য় ছবির লিংক" />
+                  <input type="url" name="image3" value={editingProduct.image3 || ''} onChange={(e)=>setEditingProduct({...editingProduct, image3: e.target.value})} className="w-full border p-2 rounded" placeholder="৩য় ছবির লিংক" />
                 </div>
 
                 <div><label className="block font-bold mb-2">বিবরণ</label><textarea value={editingProduct.description || ''} onChange={(e)=>setEditingProduct({...editingProduct, description: e.target.value})} rows="3" className="w-full border p-3 rounded"></textarea></div>
