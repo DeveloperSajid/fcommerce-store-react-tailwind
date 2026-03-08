@@ -5,6 +5,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { signOut } from 'firebase/auth'; 
 import toast from 'react-hot-toast';
 
+
 // PDF এর জন্য প্রয়োজনীয় ইম্পোর্ট
 import { jsPDF } from "jspdf";
 import "jspdf-autotable";
@@ -96,71 +97,66 @@ const Admin = () => {
   };
 
   // --- ৩. ইনভয়েস জেনারেটর ফাংশন (PDF) ---
-  const downloadInvoice = (order) => {
-    const doc = new jsPDF();
-    
-    // হেডার
-    doc.setFontSize(20);
-    doc.setTextColor(40);
-    doc.text(storeSettings.storePickupName, 105, 15, { align: "center" });
-    
-    doc.setFontSize(10);
-    doc.text(storeSettings.storePickupAddress, 105, 22, { align: "center" });
-    doc.line(20, 25, 190, 25);
+const downloadInvoice = (order) => {
+    try {
+      const doc = new jsPDF();
+      
+      // হেডার - দোকানের নাম
+      doc.setFontSize(20);
+      doc.setTextColor(40);
+      doc.text(storeSettings.storePickupName, 105, 15, { align: "center" });
+      
+      doc.setFontSize(10);
+      doc.text(storeSettings.storePickupAddress, 105, 22, { align: "center" });
+      doc.line(20, 25, 190, 25); 
 
-    // অর্ডার ইনফো
-    doc.setFontSize(12);
-    doc.text(`Invoice ID: ${order.id.slice(-6).toUpperCase()}`, 20, 35);
-    doc.text(`Date: ${order.orderDate?.toDate().toLocaleDateString('bn-BD')}`, 20, 42);
-    doc.text(`Status: ${order.status}`, 20, 49);
+      // ইনভয়েস ইনফো
+      doc.setFontSize(12);
+      doc.text(`Invoice ID: ${order.id.slice(-6).toUpperCase()}`, 20, 35);
+      doc.text(`Date: ${order.orderDate?.toDate().toLocaleDateString('bn-BD') || 'N/A'}`, 20, 42);
+      doc.text(`Status: ${order.status}`, 20, 49);
 
-    // বিলিং ডিটেইলস
-    doc.text("Bill To:", 20, 60);
-    doc.setFont(undefined, 'bold');
-    doc.text(order.customerInfo.name, 20, 67);
-    doc.setFont(undefined, 'normal');
-    doc.text(`Phone: ${order.customerInfo.phone}`, 20, 74);
-    doc.text(`Address: ${order.customerInfo.address}`, 20, 81, { maxWidth: 80 });
+      // কাস্টমার ইনফো
+      doc.setFontSize(11);
+      doc.text("Bill To:", 20, 60);
+      doc.setFont(undefined, 'bold');
+      doc.text(order.customerInfo.name, 20, 67);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Phone: ${order.customerInfo.phone}`, 20, 74);
+      doc.text(`Address: ${order.customerInfo.address}`, 20, 81, { maxWidth: 80 });
 
-    // টেবিল তৈরি
-    const tableColumn = ["Product Name", "Price", "Qty", "Total"];
-    const tableRows = [];
-
-    order.orderItems.forEach(item => {
-      const rowData = [
+      // টেবিল
+      const tableColumn = ["Product Name", "Price", "Qty", "Total"];
+      const tableRows = order.orderItems.map(item => [
         item.name,
         `${item.price} TK`,
         item.quantity,
         `${item.price * item.quantity} TK`
-      ];
-      tableRows.push(rowData);
-    });
+      ]);
 
-    doc.autoTable({
-      startY: 90,
-      head: [tableColumn],
-      body: tableRows,
-      theme: 'grid',
-      headStyles: { fillGray: [41, 128, 185], textColor: 255 }
-    });
+      doc.autoTable({
+        startY: 90,
+        head: [tableColumn],
+        body: tableRows,
+        theme: 'grid',
+        headStyles: { fillGray: [41, 128, 185], textColor: 255 }
+      });
 
-    // বিল সামারি
-    const finalY = doc.lastAutoTable.finalY + 10;
-    doc.text(`Sub-Total: ${order.totalAmount} TK`, 140, finalY);
-    doc.text(`Delivery Fee: ${order.deliveryFee || 0} TK`, 140, finalY + 7);
-    doc.setFontSize(14);
-    doc.setFont(undefined, 'bold');
-    doc.text(`Grand Total: ${order.grandTotal || order.totalAmount} TK`, 140, finalY + 15);
+      // মোট হিসাব
+      const finalY = doc.lastAutoTable.finalY + 10;
+      doc.text(`Sub-Total: ${order.totalAmount} TK`, 140, finalY);
+      doc.text(`Delivery Fee: ${order.deliveryFee || 0} TK`, 140, finalY + 7);
+      doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
+      doc.text(`Grand Total: ${order.grandTotal || order.totalAmount} TK`, 140, finalY + 15);
 
-    // ফুটার
-    doc.setFontSize(10);
-    doc.setFont(undefined, 'normal');
-    doc.text("Thank you for shopping with us!", 105, 280, { align: "center" });
-
-    doc.save(`Invoice_${order.id.slice(-6)}.pdf`);
-    toast.success("ইনভয়েস ডাউনলোড হচ্ছে...");
+      doc.save(`Invoice_${order.id.slice(-6)}.pdf`);
+      toast.success("ইনভয়েস ডাউনলোড হচ্ছে...");
+    } catch (error) {
+      console.error("PDF Error:", error);
+      toast.error("পিডিএফ তৈরি করতে সমস্যা হয়েছে। লাইব্রেরি চেক করুন।");
+    }
   };
-
   // --- ৪. প্রোডাক্ট ম্যানেজমেন্ট (এডিট) ---
   const [allProducts, setAllProducts] = useState([]);
   const [editingProduct, setEditingProduct] = useState(null); 
