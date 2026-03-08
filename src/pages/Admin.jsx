@@ -115,14 +115,26 @@ const Admin = () => {
     } catch (error) { console.error(error); alert("আপডেট করতে সমস্যা হয়েছে।"); } finally { setIsUpdating(false); }
   };
 
-  // --- ৪. সেটিংস (ডেলিভারি চার্জ) ---
-  const [deliverySettings, setDeliverySettings] = useState({ bogura: 60, dhaka: 120, others: 150 });
+  // --- ৪. সেটিংস (ডেলিভারি চার্জ এবং স্টোর পিকআপ) ---
+  const [storeSettings, setStoreSettings] = useState({ 
+    bogura: 60, 
+    dhaka: 120, 
+    others: 150,
+    storePickupName: 'Sajid Tech & Finance',
+    storePickupAddress: 'বগুড়া সদর, বগুড়া'
+  });
   const [isUpdatingSettings, setIsUpdatingSettings] = useState(false);
 
   const fetchSettings = async () => {
     try {
       const docSnap = await getDoc(doc(db, "settings", "delivery"));
-      if (docSnap.exists()) setDeliverySettings(docSnap.data());
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setStoreSettings({
+          ...storeSettings,
+          ...data
+        });
+      }
     } catch (error) { console.error("Error fetching settings:", error); }
   };
 
@@ -130,13 +142,14 @@ const Admin = () => {
     e.preventDefault();
     setIsUpdatingSettings(true);
     try {
-      // ডেটাবেসে ডেলিভারি চার্জ সেভ করা
       await setDoc(doc(db, "settings", "delivery"), {
-        bogura: Number(deliverySettings.bogura),
-        dhaka: Number(deliverySettings.dhaka),
-        others: Number(deliverySettings.others)
+        bogura: Number(storeSettings.bogura),
+        dhaka: Number(storeSettings.dhaka),
+        others: Number(storeSettings.others),
+        storePickupName: storeSettings.storePickupName,
+        storePickupAddress: storeSettings.storePickupAddress
       }, { merge: true });
-      alert("✅ ডেলিভারি চার্জ সফলভাবে আপডেট হয়েছে!");
+      alert("✅ সেটিংস সফলভাবে আপডেট হয়েছে!");
     } catch (error) {
       console.error("Error updating settings:", error); alert("সমস্যা হয়েছে!");
     } finally { setIsUpdatingSettings(false); }
@@ -160,7 +173,7 @@ const Admin = () => {
         <button onClick={() => setActiveTab('orders')} className={`px-6 py-2 rounded-md font-bold ${activeTab === 'orders' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-600 border'}`}>অর্ডারসমূহ</button>
         <button onClick={() => setActiveTab('addProduct')} className={`px-6 py-2 rounded-md font-bold ${activeTab === 'addProduct' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-600 border'}`}>নতুন প্রোডাক্ট</button>
         <button onClick={() => { setActiveTab('manageProducts'); setEditingProduct(null); }} className={`px-6 py-2 rounded-md font-bold ${activeTab === 'manageProducts' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-600 border'}`}>প্রোডাক্ট ম্যানেজমেন্ট</button>
-        <button onClick={() => setActiveTab('settings')} className={`px-6 py-2 rounded-md font-bold ${activeTab === 'settings' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-600 border'}`}>সেটিংস (ডেলিভারি)</button>
+        <button onClick={() => setActiveTab('settings')} className={`px-6 py-2 rounded-md font-bold ${activeTab === 'settings' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-600 border'}`}>সেটিংস</button>
       </div>
 
       {activeTab === 'orders' && (
@@ -216,23 +229,44 @@ const Admin = () => {
         </div>
       )}
 
-      {/* Settings Tab UI (Delivery Charges) */}
+      {/* Settings Tab UI */}
       {activeTab === 'settings' && (
-        <div className="bg-white rounded-lg shadow-lg p-8 max-w-xl mx-auto border-t-4 border-blue-600">
-          <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center border-b pb-4">ডেলিভারি চার্জ সেটিংস</h2>
+        <div className="bg-white rounded-lg shadow-lg p-8 max-w-2xl mx-auto border-t-4 border-blue-600">
+          <h2 className="text-2xl font-bold text-gray-800 mb-6 text-center border-b pb-4">ওয়েবসাইট সেটিংস</h2>
           <form onSubmit={handleUpdateSettings} className="space-y-6">
-            <div className="bg-gray-50 p-4 rounded-lg border">
-              <label className="block text-gray-700 font-bold mb-2">বগুড়া সদরের জন্য চার্জ (৳)</label>
-              <input type="number" value={deliverySettings.bogura} required onChange={(e) => setDeliverySettings({...deliverySettings, bogura: e.target.value})} className="w-full border p-3 rounded text-lg font-bold text-blue-600" />
+            
+            <div className="bg-gray-50 p-5 rounded-lg border">
+              <h3 className="font-bold text-lg mb-4 text-gray-800 border-b pb-2">🚚 ডেলিভারি চার্জ সেটিংস</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-gray-700 font-bold mb-2">বগুড়া সদর (৳)</label>
+                  <input type="number" value={storeSettings.bogura} required onChange={(e) => setStoreSettings({...storeSettings, bogura: e.target.value})} className="w-full border p-3 rounded font-bold text-blue-600" />
+                </div>
+                <div>
+                  <label className="block text-gray-700 font-bold mb-2">ঢাকা সিটি (৳)</label>
+                  <input type="number" value={storeSettings.dhaka} required onChange={(e) => setStoreSettings({...storeSettings, dhaka: e.target.value})} className="w-full border p-3 rounded font-bold text-blue-600" />
+                </div>
+                <div>
+                  <label className="block text-gray-700 font-bold mb-2">অন্যান্য জেলা (৳)</label>
+                  <input type="number" value={storeSettings.others} required onChange={(e) => setStoreSettings({...storeSettings, others: e.target.value})} className="w-full border p-3 rounded font-bold text-blue-600" />
+                </div>
+              </div>
             </div>
-            <div className="bg-gray-50 p-4 rounded-lg border">
-              <label className="block text-gray-700 font-bold mb-2">ঢাকার জন্য চার্জ (৳)</label>
-              <input type="number" value={deliverySettings.dhaka} required onChange={(e) => setDeliverySettings({...deliverySettings, dhaka: e.target.value})} className="w-full border p-3 rounded text-lg font-bold text-blue-600" />
+
+            <div className="bg-indigo-50 p-5 rounded-lg border border-indigo-100">
+              <h3 className="font-bold text-lg mb-4 text-indigo-900 border-b pb-2 border-indigo-200">🏬 স্টোর পিকআপ সেটিংস</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-indigo-800 font-bold mb-2">দোকানের নাম / পিকআপ পয়েন্ট</label>
+                  <input type="text" value={storeSettings.storePickupName} required onChange={(e) => setStoreSettings({...storeSettings, storePickupName: e.target.value})} className="w-full border p-3 rounded font-semibold text-gray-800 focus:ring-2 focus:ring-indigo-400 focus:outline-none" placeholder="যেমন: Sajid Tech & Finance" />
+                </div>
+                <div>
+                  <label className="block text-indigo-800 font-bold mb-2">পূর্ণাঙ্গ ঠিকানা</label>
+                  <input type="text" value={storeSettings.storePickupAddress} required onChange={(e) => setStoreSettings({...storeSettings, storePickupAddress: e.target.value})} className="w-full border p-3 rounded font-semibold text-gray-800 focus:ring-2 focus:ring-indigo-400 focus:outline-none" placeholder="যেমন: বগুড়া সদর, বগুড়া" />
+                </div>
+              </div>
             </div>
-            <div className="bg-gray-50 p-4 rounded-lg border">
-              <label className="block text-gray-700 font-bold mb-2">অন্যান্য জেলার জন্য চার্জ (৳)</label>
-              <input type="number" value={deliverySettings.others} required onChange={(e) => setDeliverySettings({...deliverySettings, others: e.target.value})} className="w-full border p-3 rounded text-lg font-bold text-blue-600" />
-            </div>
+
             <button type="submit" disabled={isUpdatingSettings} className={`w-full text-white font-bold py-4 rounded-lg text-lg transition ${isUpdatingSettings ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700 shadow-md'}`}>
               {isUpdatingSettings ? 'সেভ হচ্ছে...' : 'সেটিংস আপডেট করুন'}
             </button>
@@ -240,10 +274,7 @@ const Admin = () => {
         </div>
       )}
 
-      {/* addProduct and manageProducts UI omitted for brevity, but you just keep your previous UI here */}
-      {/* Since you wanted the full code, I am including the ADD and EDIT product tabs exactly as before */}
       {activeTab === 'addProduct' && (
-        /* ... আগের addProduct এর সম্পূর্ণ কোড ... */
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-2xl mx-auto">
           <h2 className="text-xl font-bold border-b pb-4 mb-6 text-center">নতুন প্রোডাক্ট আপলোড</h2>
           <form onSubmit={handleAddProduct} className="space-y-5">
@@ -301,7 +332,6 @@ const Admin = () => {
           )}
         </div>
       )}
-
     </div>
   );
 };

@@ -10,25 +10,33 @@ const Checkout = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   
-  // ডেটাবেস থেকে পাওয়া ডেলিভারি চার্জ রাখার স্টেট
-  const [deliveryCharges, setDeliveryCharges] = useState({ bogura: 60, dhaka: 120, others: 150 });
+  // ডেটাবেস থেকে পাওয়া সেটিংস (ডেলিভারি চার্জ এবং স্টোর পিকআপ অ্যাড্রেস)
+  const [storeSettings, setStoreSettings] = useState({ 
+    bogura: 60, 
+    dhaka: 120, 
+    others: 150,
+    storePickupName: 'Sajid Tech & Finance',
+    storePickupAddress: 'বগুড়া সদর, বগুড়া'
+  });
 
   const [formData, setFormData] = useState({
     name: '', phone: '01', address: '', paymentMethod: 'cod', bkashNumber: '01', trxId: '', 
-    deliveryMethod: 'homeDelivery', deliveryLocation: 'bogura' // নতুন স্টেট
+    deliveryMethod: 'homeDelivery', deliveryLocation: 'bogura'
   });
 
-  // পেজ লোড হলে ডেটাবেস থেকে বর্তমান ডেলিভারি চার্জগুলো নিয়ে আসবে
   useEffect(() => {
-    const fetchDeliveryCharges = async () => {
+    const fetchSettings = async () => {
       try {
         const docSnap = await getDoc(doc(db, "settings", "delivery"));
         if (docSnap.exists()) {
-          setDeliveryCharges(docSnap.data());
+          setStoreSettings({
+            ...storeSettings,
+            ...docSnap.data()
+          });
         }
-      } catch (error) { console.error("Error fetching charges:", error); }
+      } catch (error) { console.error("Error fetching settings:", error); }
     };
-    fetchDeliveryCharges();
+    fetchSettings();
   }, []);
 
   const handleInputChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -59,17 +67,15 @@ const Checkout = () => {
     
     setIsLoading(true);
 
-    // ১. ডেলিভারি চার্জ এবং সর্বমোট বিল ক্যালকুলেশন
-    const deliveryFee = formData.deliveryMethod === 'storePickup' ? 0 : deliveryCharges[formData.deliveryLocation];
+    const deliveryFee = formData.deliveryMethod === 'storePickup' ? 0 : storeSettings[formData.deliveryLocation];
     const grandTotal = cartTotal + deliveryFee;
 
-    // ২. স্টোর পিকআপের ঠিকানা
+    // ডায়নামিক স্টোর পিকআপের ঠিকানা
     const finalAddress = formData.deliveryMethod === 'storePickup' 
-      ? 'স্টোর পিকআপ: Sajid Tech & Finance, বগুড়া সদর, বগুড়া' 
+      ? `স্টোর পিকআপ: ${storeSettings.storePickupName}, ${storeSettings.storePickupAddress}` 
       : formData.address;
 
     try {
-      // ৩. ডেটাবেসে অর্ডার সেভ করা (নতুন চার্জসহ)
       await addDoc(collection(db, "orders"), {
         customerInfo: {
           ...formData,
@@ -77,13 +83,12 @@ const Checkout = () => {
         },
         orderItems: cart,
         totalAmount: cartTotal,
-        deliveryFee: deliveryFee, // ডেলিভারি চার্জ সেভ করা হচ্ছে
-        grandTotal: grandTotal,   // সর্বমোট বিল সেভ করা হচ্ছে
+        deliveryFee: deliveryFee,
+        grandTotal: grandTotal,
         status: "Pending",
         orderDate: serverTimestamp()
       });
 
-      // ৪. স্টক কমানো
       for (const item of cart) {
         const productRef = doc(db, "products", item.id);
         await updateDoc(productRef, {
@@ -91,14 +96,13 @@ const Checkout = () => {
         });
       }
 
-      // ৫. EmailJS দিয়ে নোটিফিকেশন পাঠানো (আপনার দেওয়া ক্রেডেনশিয়াল)
       try {
         const templateParams = {
           customer_name: formData.name,
           customer_phone: formData.phone,
           customer_address: finalAddress,
           payment_method: formData.paymentMethod,
-          total_amount: grandTotal, // ইমেইলে গ্র্যান্ড টোটাল যাবে
+          total_amount: grandTotal,
         };
         
         await emailjs.send(
@@ -108,7 +112,7 @@ const Checkout = () => {
           'A5tzlb51wbGgiSFRI'    // আপনার Public Key
         );
       } catch (emailError) {
-        console.error("Email limit reached or error: ", emailError);
+        console.error("Email error: ", emailError);
       }
 
       alert("ধন্যবাদ! আপনার অর্ডারটি সফলভাবে প্লেস হয়েছে।");
@@ -132,13 +136,11 @@ const Checkout = () => {
     );
   }
 
-  // ভ্যালিডেশন আপডেট করা হলো
   const isFormValid = formData.phone.length === 11 && 
     (formData.deliveryMethod === 'storePickup' || formData.address.length > 0) &&
     (formData.paymentMethod === 'cod' || (formData.paymentMethod === 'bkash' && formData.bkashNumber.length === 11 && formData.trxId.length > 0));
 
-  // বর্তমান ডেলিভারি ফি এবং গ্র্যান্ড টোটাল হিসাব (UI তে দেখানোর জন্য)
-  const currentDeliveryFee = formData.deliveryMethod === 'storePickup' ? 0 : deliveryCharges[formData.deliveryLocation];
+  const currentDeliveryFee = formData.deliveryMethod === 'storePickup' ? 0 : storeSettings[formData.deliveryLocation];
   const currentGrandTotal = cartTotal + currentDeliveryFee;
 
   return (
@@ -157,7 +159,6 @@ const Checkout = () => {
               <input type="tel" name="phone" value={formData.phone} required onChange={(e) => handlePhoneNumberChange(e, 'phone')} className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="01XXXXXXXXX" />
             </div>
 
-            {/* --- ডেলিভারি মেথড সিলেকশন --- */}
             <div className="pt-2">
               <label className="block font-bold mb-3 text-gray-800">ডেলিভারি মেথড সিলেক্ট করুন *</label>
               <div className="flex flex-col sm:flex-row gap-4 mb-2">
@@ -172,17 +173,15 @@ const Checkout = () => {
               </div>
             </div>
 
-            {/* যদি স্টোর পিকআপ হয়, তবে শপের অ্যাড্রেস দেখাবে */}
             {formData.deliveryMethod === 'storePickup' && (
               <div className="bg-indigo-50 p-4 rounded-md mb-4 border border-indigo-100">
                 <p className="font-bold text-indigo-800 mb-1">পিকআপ এড্রেস:</p>
-                <p className="text-sm text-indigo-700 font-bold text-lg">Sajid Tech & Finance</p>
-                <p className="text-sm text-indigo-700 font-semibold">বগুড়া সদর, বগুড়া</p>
+                <p className="text-sm text-indigo-700 font-bold text-lg">{storeSettings.storePickupName}</p>
+                <p className="text-sm text-indigo-700 font-semibold">{storeSettings.storePickupAddress}</p>
                 <p className="text-xs text-indigo-600 mt-2">অর্ডার কনফার্ম করার পর আপনি সরাসরি আমাদের শপ থেকে প্রোডাক্টটি সংগ্রহ করতে পারবেন।</p>
               </div>
             )}
 
-            {/* যদি হোম ডেলিভারি হয়, তবে কাস্টমারের জেলা এবং ঠিকানা চাইবে */}
             {formData.deliveryMethod === 'homeDelivery' && (
               <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 mb-4">
                 <label className="block font-bold text-blue-800 mb-3">আপনার জেলা/এলাকা সিলেক্ট করুন *</label>
@@ -190,17 +189,17 @@ const Checkout = () => {
                   <label className="flex items-center gap-2 cursor-pointer bg-white p-2 rounded border">
                     <input type="radio" name="deliveryLocation" value="bogura" checked={formData.deliveryLocation === 'bogura'} onChange={handleInputChange} className="w-4 h-4" />
                     <span className="font-bold text-gray-700 flex-grow">বগুড়া সদর</span>
-                    <span className="font-bold text-blue-600">৳{deliveryCharges.bogura}</span>
+                    <span className="font-bold text-blue-600">৳{storeSettings.bogura}</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer bg-white p-2 rounded border">
                     <input type="radio" name="deliveryLocation" value="dhaka" checked={formData.deliveryLocation === 'dhaka'} onChange={handleInputChange} className="w-4 h-4" />
                     <span className="font-bold text-gray-700 flex-grow">ঢাকা সিটি</span>
-                    <span className="font-bold text-blue-600">৳{deliveryCharges.dhaka}</span>
+                    <span className="font-bold text-blue-600">৳{storeSettings.dhaka}</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer bg-white p-2 rounded border">
                     <input type="radio" name="deliveryLocation" value="others" checked={formData.deliveryLocation === 'others'} onChange={handleInputChange} className="w-4 h-4" />
                     <span className="font-bold text-gray-700 flex-grow">অন্যান্য জেলা</span>
-                    <span className="font-bold text-blue-600">৳{deliveryCharges.others}</span>
+                    <span className="font-bold text-blue-600">৳{storeSettings.others}</span>
                   </label>
                 </div>
                 
