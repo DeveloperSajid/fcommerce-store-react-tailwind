@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
-import { db, auth, storage } from '../firebase'; 
+import { db, auth, storage } from '../firebase';
 import { collection, addDoc, getDocs, doc, updateDoc, increment, setDoc, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { signOut } from 'firebase/auth'; 
+import { signOut } from 'firebase/auth';
 import toast from 'react-hot-toast';
 
 
@@ -12,12 +12,12 @@ import "jspdf-autotable";
 import { FaDownload } from 'react-icons/fa';
 
 const Admin = () => {
-  const [activeTab, setActiveTab] = useState('orders'); 
+  const [activeTab, setActiveTab] = useState('orders');
   const categoriesList = ['Electronics', 'Gadgets', 'Fashion', 'Home Appliances', 'Others'];
 
   // --- ১. প্রোডাক্ট যোগ করার স্টেট (৩টি ছবির অপশনসহ) ---
   const [product, setProduct] = useState({ name: '', price: '', stock: '', description: '', category: 'Electronics', image: '', image2: '', image3: '' });
-  const [imageFile, setImageFile] = useState(null); 
+  const [imageFile, setImageFile] = useState(null);
   const [isAddingProduct, setIsAddingProduct] = useState(false);
 
   const handleAddInputChange = (e) => setProduct({ ...product, [e.target.name]: e.target.value });
@@ -28,19 +28,19 @@ const Admin = () => {
     if (!product.image && !imageFile) return toast.error("প্রধান ছবির লিংক দিন অথবা আপলোড করুন!");
     setIsAddingProduct(true);
     try {
-      let imageUrl = product.image; 
+      let imageUrl = product.image;
       if (imageFile) {
         const imageRef = ref(storage, `products/${Date.now()}_${imageFile.name}`);
         await uploadBytes(imageRef, imageFile);
         imageUrl = await getDownloadURL(imageRef);
       }
-      
+
       await addDoc(collection(db, "products"), {
-        name: product.name, 
-        price: Number(product.price), 
-        stock: Number(product.stock), 
+        name: product.name,
+        price: Number(product.price),
+        stock: Number(product.stock),
         description: product.description,
-        category: product.category, 
+        category: product.category,
         image: imageUrl,
         image2: product.image2 || '',
         image3: product.image3 || ''
@@ -48,8 +48,8 @@ const Admin = () => {
 
       toast.success("🎉 প্রোডাক্ট সফলভাবে যোগ করা হয়েছে!");
       setProduct({ name: '', price: '', stock: '', description: '', category: 'Electronics', image: '', image2: '', image3: '' });
-      setImageFile(null); 
-      document.getElementById('imageInput').value = ''; 
+      setImageFile(null);
+      document.getElementById('imageInput').value = '';
     } catch (error) {
       console.error(error); toast.error("প্রোডাক্ট যোগ করতে সমস্যা হয়েছে।");
     } finally { setIsAddingProduct(false); }
@@ -70,7 +70,7 @@ const Admin = () => {
   };
 
   const getAdminStatusColor = (status) => {
-    switch(status) {
+    switch (status) {
       case 'Pending': return 'bg-yellow-100 text-yellow-700 border-yellow-200';
       case 'Hold': return 'bg-orange-100 text-orange-700 border-orange-200';
       case 'Processing': return 'bg-blue-100 text-blue-700 border-blue-200';
@@ -92,23 +92,23 @@ const Admin = () => {
         }
       }
       toast.success(`স্ট্যাটাস '${newStatus}'-এ আপডেট হয়েছে!`);
-      fetchOrders(); 
+      fetchOrders();
     } catch (error) { console.error(error); toast.error("স্ট্যাটাস আপডেট করতে সমস্যা হয়েছে।"); }
   };
 
   // --- ৩. ইনভয়েস জেনারেটর ফাংশন (PDF) ---
-const downloadInvoice = (order) => {
+  const downloadInvoice = (order) => {
     try {
       const doc = new jsPDF();
-      
+
       // হেডার - দোকানের নাম
       doc.setFontSize(20);
       doc.setTextColor(40);
       doc.text(storeSettings.storePickupName, 105, 15, { align: "center" });
-      
+
       doc.setFontSize(10);
       doc.text(storeSettings.storePickupAddress, 105, 22, { align: "center" });
-      doc.line(20, 25, 190, 25); 
+      doc.line(20, 25, 190, 25);
 
       // ইনভয়েস ইনফো
       doc.setFontSize(12);
@@ -159,8 +159,8 @@ const downloadInvoice = (order) => {
   };
   // --- ৪. প্রোডাক্ট ম্যানেজমেন্ট (এডিট) ---
   const [allProducts, setAllProducts] = useState([]);
-  const [editingProduct, setEditingProduct] = useState(null); 
-  const [editImageFile, setEditImageFile] = useState(null); 
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [editImageFile, setEditImageFile] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
 
   const fetchAllProducts = async () => {
@@ -175,18 +175,18 @@ const downloadInvoice = (order) => {
     if (!editingProduct.image && !editImageFile) return toast.error("প্রধান ছবির লিংক দিন!");
     setIsUpdating(true);
     try {
-      let imageUrl = editingProduct.image; 
+      let imageUrl = editingProduct.image;
       if (editImageFile) {
         const imageRef = ref(storage, `products/${Date.now()}_${editImageFile.name}`);
         await uploadBytes(imageRef, editImageFile);
         imageUrl = await getDownloadURL(imageRef);
       }
-      
+
       await updateDoc(doc(db, "products", editingProduct.id), {
-        name: editingProduct.name, 
-        price: Number(editingProduct.price), 
+        name: editingProduct.name,
+        price: Number(editingProduct.price),
         stock: Number(editingProduct.stock),
-        description: editingProduct.description || '', 
+        description: editingProduct.description || '',
         category: editingProduct.category || 'Others',
         image: imageUrl,
         image2: editingProduct.image2 || '',
@@ -194,14 +194,14 @@ const downloadInvoice = (order) => {
       });
 
       toast.success("প্রোডাক্ট আপডেট হয়েছে!");
-      setEditingProduct(null); setEditImageFile(null); fetchAllProducts(); 
+      setEditingProduct(null); setEditImageFile(null); fetchAllProducts();
     } catch (error) { console.error(error); toast.error("আপডেট করতে সমস্যা হয়েছে।"); } finally { setIsUpdating(false); }
   };
 
   // --- ৫. সেটিংস (ডেলিভারি ও স্টোর পিকআপ) ---
-  const [storeSettings, setStoreSettings] = useState({ 
-    bogura: 60, 
-    dhaka: 120, 
+  const [storeSettings, setStoreSettings] = useState({
+    bogura: 60,
+    dhaka: 120,
     others: 150,
     storePickupName: 'Sajid Tech & Finance',
     storePickupAddress: 'বগুড়া সদর, বগুড়া।'
@@ -290,7 +290,7 @@ const downloadInvoice = (order) => {
                     <span>সর্বমোট বিল:</span><span>৳{order.grandTotal || order.totalAmount}</span>
                   </div>
                 </div>
-                
+
                 {/* স্ট্যাটাস ড্রপডাউন এবং ইনভয়েস বাটন */}
                 <div className="flex flex-col gap-2 mt-4 border-t pt-4">
                   <div className="flex items-center gap-2">
@@ -304,13 +304,19 @@ const downloadInvoice = (order) => {
                       <option value="Cancelled">Cancelled</option>
                     </select>
                   </div>
-                  
-                  <button 
-                    onClick={() => downloadInvoice(order)}
-                    className="w-full bg-gray-800 text-white py-2 rounded-md font-bold flex justify-center items-center gap-2 hover:bg-black transition text-sm shadow-sm"
+
+                  {/* --- ঠিক এখানে নিচের বাটন কোডটি পেস্ট করুন --- */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      downloadInvoice(order);
+                    }}
+                    className="w-full bg-gray-800 text-white py-2 rounded-md font-bold flex justify-center items-center gap-2 hover:bg-black transition text-sm shadow-sm mt-3"
                   >
                     <FaDownload size={14} /> Download Invoice (PDF)
                   </button>
+                  {/* --- পেস্ট করা শেষ --- */}
                 </div>
               </div>
             ))}
@@ -327,15 +333,15 @@ const downloadInvoice = (order) => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-gray-700 font-bold mb-2">বগুড়া (৳)</label>
-                  <input type="number" value={storeSettings.bogura} required onChange={(e) => setStoreSettings({...storeSettings, bogura: e.target.value})} className="w-full border p-3 rounded font-bold text-blue-600" />
+                  <input type="number" value={storeSettings.bogura} required onChange={(e) => setStoreSettings({ ...storeSettings, bogura: e.target.value })} className="w-full border p-3 rounded font-bold text-blue-600" />
                 </div>
                 <div>
                   <label className="block text-gray-700 font-bold mb-2">ঢাকা (৳)</label>
-                  <input type="number" value={storeSettings.dhaka} required onChange={(e) => setStoreSettings({...storeSettings, dhaka: e.target.value})} className="w-full border p-3 rounded font-bold text-blue-600" />
+                  <input type="number" value={storeSettings.dhaka} required onChange={(e) => setStoreSettings({ ...storeSettings, dhaka: e.target.value })} className="w-full border p-3 rounded font-bold text-blue-600" />
                 </div>
                 <div>
                   <label className="block text-gray-700 font-bold mb-2">অন্যান্য (৳)</label>
-                  <input type="number" value={storeSettings.others} required onChange={(e) => setStoreSettings({...storeSettings, others: e.target.value})} className="w-full border p-3 rounded font-bold text-blue-600" />
+                  <input type="number" value={storeSettings.others} required onChange={(e) => setStoreSettings({ ...storeSettings, others: e.target.value })} className="w-full border p-3 rounded font-bold text-blue-600" />
                 </div>
               </div>
             </div>
@@ -345,11 +351,11 @@ const downloadInvoice = (order) => {
               <div className="space-y-4">
                 <div>
                   <label className="block text-indigo-800 font-bold mb-2">দোকানের নাম</label>
-                  <input type="text" value={storeSettings.storePickupName} required onChange={(e) => setStoreSettings({...storeSettings, storePickupName: e.target.value})} className="w-full border p-3 rounded font-semibold text-gray-800" />
+                  <input type="text" value={storeSettings.storePickupName} required onChange={(e) => setStoreSettings({ ...storeSettings, storePickupName: e.target.value })} className="w-full border p-3 rounded font-semibold text-gray-800" />
                 </div>
                 <div>
                   <label className="block text-indigo-800 font-bold mb-2">ঠিকানা</label>
-                  <input type="text" value={storeSettings.storePickupAddress} required onChange={(e) => setStoreSettings({...storeSettings, storePickupAddress: e.target.value})} className="w-full border p-3 rounded font-semibold text-gray-800" />
+                  <input type="text" value={storeSettings.storePickupAddress} required onChange={(e) => setStoreSettings({ ...storeSettings, storePickupAddress: e.target.value })} className="w-full border p-3 rounded font-semibold text-gray-800" />
                 </div>
               </div>
             </div>
@@ -371,14 +377,14 @@ const downloadInvoice = (order) => {
               <div><label className="block font-bold mb-2">স্টক *</label><input type="number" name="stock" value={product.stock} required onChange={handleAddInputChange} className="w-full border p-3 rounded" /></div>
               <div><label className="block font-bold mb-2">ক্যাটাগরি *</label><select name="category" value={product.category} onChange={handleAddInputChange} className="w-full border p-3 rounded bg-white">{categoriesList.map(cat => <option key={cat} value={cat}>{cat}</option>)}</select></div>
             </div>
-            
+
             <div className="space-y-4">
               <div className="border border-blue-200 p-5 rounded-lg bg-blue-50 bg-opacity-30">
                 <h3 className="font-bold mb-3 border-b pb-2">প্রধান ছবি (আবশ্যক) *</h3>
                 <input type="url" name="image" value={product.image} onChange={handleAddInputChange} className="w-full border p-2 rounded mb-2 bg-white" placeholder="URL দিন" />
                 <input type="file" id="imageInput" accept="image/*" onChange={handleImageChange} className="w-full text-sm" />
               </div>
-              
+
               <div className="border border-gray-200 p-4 rounded-lg bg-gray-50">
                 <h3 className="font-bold text-gray-600 mb-2 border-b pb-2">২য় ছবি (ঐচ্ছিক)</h3>
                 <input type="url" name="image2" value={product.image2} onChange={handleAddInputChange} className="w-full border p-2 rounded focus:outline-none bg-white" placeholder="২য় ছবির লিংক (URL) দিন" />
@@ -403,23 +409,23 @@ const downloadInvoice = (order) => {
             <div className="max-w-2xl mx-auto">
               <button onClick={() => setEditingProduct(null)} className="mb-4 text-blue-600 font-bold">← ফিরে যান</button>
               <form onSubmit={handleUpdateProduct} className="space-y-5 border p-5 rounded bg-gray-50">
-                <div><label className="block font-bold mb-2">নাম</label><input type="text" name="name" value={editingProduct.name} required onChange={(e)=>setEditingProduct({...editingProduct, name: e.target.value})} className="w-full border p-3 rounded" /></div>
+                <div><label className="block font-bold mb-2">নাম</label><input type="text" name="name" value={editingProduct.name} required onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })} className="w-full border p-3 rounded" /></div>
                 <div className="grid grid-cols-2 gap-5">
-                  <div><label className="block font-bold mb-2">দাম</label><input type="number" name="price" value={editingProduct.price} required onChange={(e)=>setEditingProduct({...editingProduct, price: e.target.value})} className="w-full border p-3 rounded" /></div>
-                  <div><label className="block font-bold mb-2">স্টক</label><input type="number" name="stock" value={editingProduct.stock} required onChange={(e)=>setEditingProduct({...editingProduct, stock: e.target.value})} className="w-full border p-3 rounded" /></div>
+                  <div><label className="block font-bold mb-2">দাম</label><input type="number" name="price" value={editingProduct.price} required onChange={(e) => setEditingProduct({ ...editingProduct, price: e.target.value })} className="w-full border p-3 rounded" /></div>
+                  <div><label className="block font-bold mb-2">স্টক</label><input type="number" name="stock" value={editingProduct.stock} required onChange={(e) => setEditingProduct({ ...editingProduct, stock: e.target.value })} className="w-full border p-3 rounded" /></div>
                 </div>
-                
+
                 <div className="space-y-4">
                   <div className="border p-4 rounded bg-white">
                     <h3 className="font-bold mb-2">প্রধান ছবি এডিট</h3>
-                    <input type="url" value={editingProduct.image} onChange={(e)=>setEditingProduct({...editingProduct, image: e.target.value})} className="w-full border p-2 rounded mb-2" />
+                    <input type="url" value={editingProduct.image} onChange={(e) => setEditingProduct({ ...editingProduct, image: e.target.value })} className="w-full border p-2 rounded mb-2" />
                     <input type="file" accept="image/*" onChange={(e) => setEditImageFile(e.target.files[0])} className="w-full text-sm" />
                   </div>
-                  <input type="url" name="image2" value={editingProduct.image2 || ''} onChange={(e)=>setEditingProduct({...editingProduct, image2: e.target.value})} className="w-full border p-2 rounded" placeholder="২য় ছবির লিংক" />
-                  <input type="url" name="image3" value={editingProduct.image3 || ''} onChange={(e)=>setEditingProduct({...editingProduct, image3: e.target.value})} className="w-full border p-2 rounded" placeholder="৩য় ছবির লিংক" />
+                  <input type="url" name="image2" value={editingProduct.image2 || ''} onChange={(e) => setEditingProduct({ ...editingProduct, image2: e.target.value })} className="w-full border p-2 rounded" placeholder="২য় ছবির লিংক" />
+                  <input type="url" name="image3" value={editingProduct.image3 || ''} onChange={(e) => setEditingProduct({ ...editingProduct, image3: e.target.value })} className="w-full border p-2 rounded" placeholder="৩য় ছবির লিংক" />
                 </div>
 
-                <div><label className="block font-bold mb-2">বিবরণ</label><textarea value={editingProduct.description || ''} onChange={(e)=>setEditingProduct({...editingProduct, description: e.target.value})} rows="3" className="w-full border p-3 rounded"></textarea></div>
+                <div><label className="block font-bold mb-2">বিবরণ</label><textarea value={editingProduct.description || ''} onChange={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })} rows="3" className="w-full border p-3 rounded"></textarea></div>
                 <button type="submit" disabled={isUpdating} className={`w-full text-white font-bold py-3 rounded mt-4 ${isUpdating ? 'bg-gray-400' : 'bg-green-600'}`}>পরিবর্তন সেভ করুন</button>
               </form>
             </div>
