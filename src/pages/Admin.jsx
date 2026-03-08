@@ -1,34 +1,56 @@
 import { useState, useEffect } from 'react';
-import { db, auth } from '../firebase'; 
+import { db, auth, storage } from '../firebase'; 
 import { collection, addDoc, getDocs, doc, updateDoc, increment } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { signOut } from 'firebase/auth'; 
 
 const Admin = () => {
   const [activeTab, setActiveTab] = useState('orders'); 
-
-  // ক্যাটাগরির লিস্ট
   const categoriesList = ['Electronics', 'Gadgets', 'Fashion', 'Home Appliances', 'Others'];
 
-  // --- ১. প্রোডাক্ট অ্যাড করার স্টেট (category যুক্ত করা হলো) ---
-  const [product, setProduct] = useState({ name: '', price: '', stock: '', image: '', description: '', category: 'Electronics' });
+  // --- ১. প্রোডাক্ট অ্যাড করার স্টেট ---
+  const [product, setProduct] = useState({ name: '', price: '', stock: '', description: '', category: 'Electronics', image: '' });
+  const [imageFile, setImageFile] = useState(null); 
   const [isAddingProduct, setIsAddingProduct] = useState(false);
 
   const handleAddInputChange = (e) => setProduct({ ...product, [e.target.name]: e.target.value });
+  
+  const handleImageChange = (e) => {
+    if (e.target.files[0]) {
+      setImageFile(e.target.files[0]);
+    }
+  };
 
   const handleAddProduct = async (e) => {
     e.preventDefault();
+    
+    if (!product.image && !imageFile) {
+      return alert("অনুগ্রহ করে ছবির লিংক দিন অথবা একটি ছবি আপলোড করুন!");
+    }
+    
     setIsAddingProduct(true);
     try {
+      let imageUrl = product.image; 
+
+      if (imageFile) {
+        const imageRef = ref(storage, `products/${Date.now()}_${imageFile.name}`);
+        await uploadBytes(imageRef, imageFile);
+        imageUrl = await getDownloadURL(imageRef);
+      }
+
       await addDoc(collection(db, "products"), {
         name: product.name,
         price: Number(product.price),
         stock: Number(product.stock),
-        image: product.image,
         description: product.description,
-        category: product.category // ক্যাটাগরি ডেটাবেসে যাচ্ছে
+        category: product.category,
+        image: imageUrl 
       });
+
       alert("🎉 প্রোডাক্ট সফলভাবে ডেটাবেসে যোগ করা হয়েছে!");
-      setProduct({ name: '', price: '', stock: '', image: '', description: '', category: 'Electronics' });
+      setProduct({ name: '', price: '', stock: '', description: '', category: 'Electronics', image: '' });
+      setImageFile(null); 
+      document.getElementById('imageInput').value = ''; 
     } catch (error) {
       console.error(error);
       alert("দুঃখিত, প্রোডাক্ট যোগ করতে সমস্যা হয়েছে।");
@@ -63,7 +85,6 @@ const Admin = () => {
     try {
       const orderRef = doc(db, "orders", order.id);
       await updateDoc(orderRef, { status: newStatus });
-
       if (newStatus === 'Cancelled') {
         for (const item of order.orderItems) {
           const productRef = doc(db, "products", item.id);
@@ -78,10 +99,11 @@ const Admin = () => {
     }
   };
 
-  // --- ৩. প্রোডাক্ট ম্যানেজমেন্ট (এডিট/স্টক আপডেট) ---
+  // --- ৩. প্রোডাক্ট ম্যানেজমেন্ট (এডিট) ---
   const [allProducts, setAllProducts] = useState([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null); 
+  const [editImageFile, setEditImageFile] = useState(null); 
   const [isUpdating, setIsUpdating] = useState(false);
 
   const fetchAllProducts = async () => {
@@ -101,21 +123,41 @@ const Admin = () => {
     setEditingProduct({ ...editingProduct, [e.target.name]: e.target.value });
   };
 
+  const handleEditImageChange = (e) => {
+    if (e.target.files[0]) {
+      setEditImageFile(e.target.files[0]);
+    }
+  };
+
   const handleUpdateProduct = async (e) => {
     e.preventDefault();
+    
+    if (!editingProduct.image && !editImageFile) {
+      return alert("অনুগ্রহ করে ছবির লিংক দিন অথবা একটি ছবি আপলোড করুন!");
+    }
+
     setIsUpdating(true);
     try {
+      let imageUrl = editingProduct.image; 
+
+      if (editImageFile) {
+        const imageRef = ref(storage, `products/${Date.now()}_${editImageFile.name}`);
+        await uploadBytes(imageRef, editImageFile);
+        imageUrl = await getDownloadURL(imageRef);
+      }
+
       const productRef = doc(db, "products", editingProduct.id);
       await updateDoc(productRef, {
         name: editingProduct.name,
         price: Number(editingProduct.price),
         stock: Number(editingProduct.stock),
-        image: editingProduct.image,
         description: editingProduct.description || '',
-        category: editingProduct.category || 'Others' // আপডেট করার সময় ক্যাটাগরি পাঠানো হচ্ছে
+        category: editingProduct.category || 'Others',
+        image: imageUrl 
       });
       alert("প্রোডাক্ট সফলভাবে আপডেট করা হয়েছে!");
       setEditingProduct(null); 
+      setEditImageFile(null);
       fetchAllProducts(); 
     } catch (error) {
       console.error(error);
@@ -146,17 +188,17 @@ const Admin = () => {
         <button onClick={() => { setActiveTab('manageProducts'); setEditingProduct(null); }} className={`px-6 py-2 rounded-md font-bold transition duration-300 ${activeTab === 'manageProducts' ? 'bg-blue-600 text-white shadow-lg' : 'bg-white text-gray-600 border hover:bg-gray-100'}`}>প্রোডাক্ট ম্যানেজমেন্ট (এডিট)</button>
       </div>
 
+      {/* --- কাস্টমার অর্ডার --- */}
       {activeTab === 'orders' && (
         <div className="bg-white rounded-lg shadow-lg p-6">
-          {/* ... অর্ডার লিস্টের কোড আগের মতোই আছে ... */}
           <h2 className="text-xl font-bold text-gray-800 border-b pb-4 mb-6">সর্বশেষ অর্ডারসমূহ</h2>
           {isLoadingOrders ? (
             <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div></div>
           ) : orders.length === 0 ? (
             <div className="text-center text-gray-500 py-10">এখনো কোনো অর্ডার আসেনি।</div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {orders.map(order => (
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+               {orders.map(order => (
                 <div key={order.id} className="border rounded-lg p-5 shadow-sm hover:shadow-md transition">
                   <div className="flex justify-between items-start mb-4 border-b pb-3">
                     <div>
@@ -188,32 +230,32 @@ const Admin = () => {
                   )}
                 </div>
               ))}
-            </div>
+             </div>
           )}
         </div>
       )}
 
+      {/* --- নতুন প্রোডাক্ট আপলোড --- */}
       {activeTab === 'addProduct' && (
         <div className="bg-white rounded-lg shadow-lg p-8 max-w-2xl mx-auto">
           <h2 className="text-xl font-bold text-gray-800 mb-6 text-center border-b pb-4">নতুন প্রোডাক্ট আপলোড করুন</h2>
           <form onSubmit={handleAddProduct} className="space-y-5">
             <div>
-              <label className="block text-gray-700 font-bold mb-2">প্রোডাক্টের নাম</label>
+              <label className="block text-gray-700 font-bold mb-2">প্রোডাক্টের নাম *</label>
               <input type="text" name="name" value={product.name} required onChange={handleAddInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               <div>
-                <label className="block text-gray-700 font-bold mb-2">দাম (টাকা)</label>
+                <label className="block text-gray-700 font-bold mb-2">দাম (টাকা) *</label>
                 <input type="number" name="price" value={product.price} required onChange={handleAddInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
               <div>
-                <label className="block text-gray-700 font-bold mb-2">স্টক (পরিমাণ)</label>
+                <label className="block text-gray-700 font-bold mb-2">স্টক (পরিমাণ) *</label>
                 <input type="number" name="stock" value={product.stock} required onChange={handleAddInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
               </div>
-              {/* ক্যাটাগরি অপশন */}
               <div>
-                <label className="block text-gray-700 font-bold mb-2">ক্যাটাগরি</label>
+                <label className="block text-gray-700 font-bold mb-2">ক্যাটাগরি *</label>
                 <select name="category" value={product.category} onChange={handleAddInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
                   {categoriesList.map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
@@ -222,23 +264,59 @@ const Admin = () => {
               </div>
             </div>
 
-            <div>
-              <label className="block text-gray-700 font-bold mb-2">ছবির লিংক (URL)</label>
-              <input type="url" name="image" value={product.image} required onChange={handleAddInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            <div className="border border-gray-300 p-5 rounded-lg bg-blue-50 bg-opacity-30">
+              <h3 className="font-bold text-gray-700 mb-4 border-b pb-2">প্রোডাক্টের ছবি <span className="text-sm font-normal text-red-500">(যেকোনো একটি পদ্ধতি বেছে নিন) *</span></h3>
+              
+              <div className="mb-4">
+                <label className="block text-gray-700 text-sm font-bold mb-2">পদ্ধতি ১: ছবির লিংক (URL) দিন</label>
+                <input type="url" name="image" value={product.image} onChange={handleAddInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" placeholder="https://example.com/image.jpg" />
+              </div>
+
+              <div className="relative flex items-center py-2">
+                <div className="flex-grow border-t border-gray-300"></div>
+                <span className="flex-shrink-0 mx-4 text-gray-400 font-bold text-sm">অথবা</span>
+                <div className="flex-grow border-t border-gray-300"></div>
+              </div>
+
+              <div className="mt-2">
+                <label className="block text-gray-700 text-sm font-bold mb-2">পদ্ধতি ২: ডিভাইস থেকে ছবি আপলোড করুন</label>
+                <input 
+                  id="imageInput"
+                  type="file" 
+                  accept="image/*" 
+                  onChange={handleImageChange} 
+                  className="w-full bg-white border p-2 rounded cursor-pointer file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200" 
+                />
+              </div>
+
+              {/* নতুন: ছবির প্রিভিউ সেকশন */}
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <p className="text-sm font-bold text-gray-700 mb-2">ছবির প্রিভিউ:</p>
+                {imageFile ? (
+                  <img src={URL.createObjectURL(imageFile)} alt="Preview File" className="h-40 object-cover rounded border shadow-sm" />
+                ) : product.image ? (
+                  <img src={product.image} alt="Preview URL" className="h-40 object-cover rounded border shadow-sm" />
+                ) : (
+                  <div className="h-40 w-full bg-white border-2 border-dashed border-gray-300 rounded flex items-center justify-center text-gray-400 text-sm">
+                    কোনো ছবি সিলেক্ট করা হয়নি
+                  </div>
+                )}
+              </div>
             </div>
             
             <div>
-              <label className="block text-gray-700 font-bold mb-2">প্রোডাক্টের বিবরণ</label>
+              <label className="block text-gray-700 font-bold mb-2">প্রোডাক্টের বিবরণ *</label>
               <textarea name="description" value={product.description} required onChange={handleAddInputChange} rows="4" className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
             </div>
 
             <button type="submit" disabled={isAddingProduct} className={`w-full text-white font-bold py-3 rounded-md mt-4 transition ${isAddingProduct ? 'bg-gray-400' : 'bg-blue-600 hover:bg-blue-700'}`}>
-              {isAddingProduct ? 'আপলোড হচ্ছে...' : 'প্রোডাক্ট আপলোড করুন'}
+              {isAddingProduct ? 'আপলোড হচ্ছে (অপেক্ষা করুন)...' : 'প্রোডাক্ট আপলোড করুন'}
             </button>
           </form>
         </div>
       )}
 
+      {/* --- প্রোডাক্ট এডিট --- */}
       {activeTab === 'manageProducts' && (
         <div className="bg-white rounded-lg shadow-lg p-6">
           <h2 className="text-xl font-bold text-gray-800 border-b pb-4 mb-6">{editingProduct ? 'প্রোডাক্ট এডিট করুন' : 'সকল প্রোডাক্ট'}</h2>
@@ -247,35 +325,61 @@ const Admin = () => {
               <button onClick={() => setEditingProduct(null)} className="mb-6 text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-2">← ফিরে যান</button>
               <form onSubmit={handleUpdateProduct} className="space-y-5 bg-gray-50 p-6 rounded-lg border">
                 <div>
-                  <label className="block text-gray-700 font-bold mb-2">প্রোডাক্টের নাম</label>
+                  <label className="block text-gray-700 font-bold mb-2">প্রোডাক্টের নাম *</label>
                   <input type="text" name="name" value={editingProduct.name} required onChange={handleEditInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                   <div>
-                    <label className="block text-gray-700 font-bold mb-2">দাম (টাকা)</label>
+                    <label className="block text-gray-700 font-bold mb-2">দাম (টাকা) *</label>
                     <input type="number" name="price" value={editingProduct.price} required onChange={handleEditInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
                   <div>
-                    <label className="block text-gray-700 font-bold mb-2">বর্তমান স্টক</label>
+                    <label className="block text-gray-700 font-bold mb-2">বর্তমান স্টক *</label>
                     <input type="number" name="stock" value={editingProduct.stock} required onChange={handleEditInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
                   </div>
-                  {/* এডিট ফর্মে ক্যাটাগরি অপশন */}
                   <div>
-                    <label className="block text-gray-700 font-bold mb-2">ক্যাটাগরি</label>
+                    <label className="block text-gray-700 font-bold mb-2">ক্যাটাগরি *</label>
                     <select name="category" value={editingProduct.category || 'Others'} onChange={handleEditInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
                       {categoriesList.map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
+                         <option key={cat} value={cat}>{cat}</option>
                       ))}
                     </select>
                   </div>
                 </div>
-                <div>
-                  <label className="block text-gray-700 font-bold mb-2">ছবির লিংক (URL)</label>
-                  <input type="url" name="image" value={editingProduct.image} required onChange={handleEditInputChange} className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                
+                <div className="border border-gray-300 p-5 rounded-lg bg-white">
+                  <h3 className="font-bold text-gray-700 mb-4 border-b pb-2">প্রোডাক্টের ছবি এডিট</h3>
+                  
+                  <div className="mb-4">
+                    <label className="block text-gray-700 text-sm font-bold mb-2">লিংক (URL) পরিবর্তন করুন</label>
+                    <input type="url" name="image" value={editingProduct.image} onChange={handleEditInputChange} className="w-full border p-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                  </div>
+
+                  <div className="relative flex items-center py-2">
+                    <div className="flex-grow border-t border-gray-200"></div>
+                    <span className="flex-shrink-0 mx-4 text-gray-400 font-bold text-sm">অথবা</span>
+                    <div className="flex-grow border-t border-gray-200"></div>
+                  </div>
+
+                  <div className="mt-2">
+                    <label className="block text-gray-700 text-sm font-bold mb-2">নতুন ছবি আপলোড করুন</label>
+                    <input type="file" accept="image/*" onChange={handleEditImageChange} className="w-full text-sm file:mr-4 file:py-1 file:px-3 file:rounded-full file:border-0 file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer" />
+                  </div>
+
+                  {/* এডিট ফর্মে বর্তমান/নতুন ছবির প্রিভিউ */}
+                  <div className="mt-4 pt-3 border-t">
+                    <p className="text-sm font-bold text-gray-600 mb-2">বর্তমান/নতুন ছবির প্রিভিউ:</p>
+                    {editImageFile ? (
+                      <img src={URL.createObjectURL(editImageFile)} alt="New Preview" className="h-32 object-cover rounded border shadow-sm" />
+                    ) : editingProduct.image ? (
+                      <img src={editingProduct.image} alt="Current Preview" className="h-32 object-cover rounded border shadow-sm" />
+                    ) : null}
+                  </div>
                 </div>
+
                 <div>
-                  <label className="block text-gray-700 font-bold mb-2">প্রোডাক্টের বিবরণ</label>
-                  <textarea name="description" value={editingProduct.description || ''} onChange={handleEditInputChange} rows="4" className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                  <label className="block text-gray-700 font-bold mb-2">প্রোডাক্টের বিবরণ *</label>
+                  <textarea name="description" value={editingProduct.description || ''} required onChange={handleEditInputChange} rows="4" className="w-full border p-3 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
                 </div>
                 <button type="submit" disabled={isUpdating} className={`w-full text-white font-bold py-3 rounded-md mt-4 transition ${isUpdating ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'}`}>
                   {isUpdating ? 'আপডেট হচ্ছে...' : 'পরিবর্তন সেভ করুন'}
@@ -283,7 +387,7 @@ const Admin = () => {
               </form>
             </div>
           ) : (
-            isLoadingProducts ? (
+             isLoadingProducts ? (
               <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div></div>
             ) : allProducts.length === 0 ? (
               <div className="text-center text-gray-500 py-10">কোনো প্রোডাক্ট পাওয়া যায়নি।</div>
@@ -291,7 +395,6 @@ const Admin = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                 {allProducts.map(prod => (
                   <div key={prod.id} className="border p-4 rounded-lg flex flex-col hover:shadow-md transition bg-gray-50 relative">
-                    {/* কার্ডের উপরে ক্যাটাগরি ব্যাজ */}
                     <span className="absolute top-2 right-2 bg-gray-800 text-white text-[10px] px-2 py-1 rounded-full z-10">
                       {prod.category || 'Others'}
                     </span>
@@ -311,7 +414,6 @@ const Admin = () => {
           )}
         </div>
       )}
-
     </div>
   );
 };

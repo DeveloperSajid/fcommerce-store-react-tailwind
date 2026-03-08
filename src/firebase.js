@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
-import { getAuth } from "firebase/auth"; // এটি নতুন যুক্ত হলো
+import { getAuth } from "firebase/auth";
+import { getStorage } from "firebase/storage"; // নতুন যুক্ত হলো
 
 const firebaseConfig = {
   apiKey: "AIzaSyDUH0Y352-rz9gAYOZp0-4YHTk8pTwtyos",
@@ -13,4 +14,12 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
-export const auth = getAuth(app); // এটি নতুন যুক্ত হলো
+export const auth = getAuth(app);
+export const storage = getStorage(app); // নতুন যুক্ত হলো
+
+
+
+
+
+
+
